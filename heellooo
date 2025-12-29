@@ -1,0 +1,165 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+from matplotlib.widgets import Button
+import scipy.ndimage  # for cinematic smoothing
+
+# =========================================================
+# Grid & constants
+# =========================================================
+Nx = Ny = 512
+Lx = Ly = 10.0
+dx, dy = Lx/Nx, Ly/Ny
+
+x = np.linspace(-Lx/2, Lx/2, Nx)
+y = np.linspace(-Ly/2, Ly/2, Ny)
+X, Y = np.meshgrid(x, y)
+
+dt = 0.002
+hbar = 1.0
+m = 1.0
+
+# =========================================================
+# Potential: double slit barrier
+# =========================================================
+V = np.zeros((Ny, Nx), dtype=np.float32)
+
+barrier_y = 0.0
+thickness = 0.2
+slit_sep = 1.5
+slit_width = 0.3
+
+for i in range(Ny):
+    if abs(y[i] - barrier_y) < thickness:
+        for j in range(Nx):
+            if not (
+                abs(x[j] - slit_sep/2) < slit_width or
+                abs(x[j] + slit_sep/2) < slit_width
+            ):
+                V[i, j] = 1e4
+
+# =========================================================
+# Absorbing boundary (prevents reflections)
+# =========================================================
+absorb = np.ones((Ny, Nx), dtype=np.float32)
+edge = int(0.08 * Nx)
+
+for i in range(Ny):
+    for j in range(Nx):
+        di = min(i, Ny - i - 1)
+        dj = min(j, Nx - j - 1)
+        d = min(di, dj)
+        if d < edge:
+            absorb[i, j] = np.exp(-((edge - d) / edge)**2 * 4)
+
+# =========================================================
+# Initial wavepacket
+# =========================================================
+kx, ky = 0.0, 15.0
+sigma = 0.35
+
+psi0 = np.exp(-((X)**2 + (Y + 3)**2) / (2 * sigma**2)).astype(np.complex64)
+psi0 *= np.exp(1j * (kx * X + ky * Y))
+psi0 /= np.sqrt(np.sum(np.abs(psi0)**2))
+
+# =========================================================
+# Fourier space
+# =========================================================
+kx_vals = 2 * np.pi * np.fft.fftfreq(Nx, dx)
+ky_vals = 2 * np.pi * np.fft.fftfreq(Ny, dy)
+KX, KY = np.meshgrid(kx_vals, ky_vals)
+K2 = (KX**2 + KY**2).astype(np.float32)
+
+# =========================================================
+# Precomputed propagators
+# =========================================================
+expV = np.exp(-1j * V * dt / (2 * hbar)).astype(np.complex64)
+expK = np.exp(-1j * hbar * K2 * dt / (2 * m)).astype(np.complex64)
+
+# =========================================================
+# Evolution step
+# =========================================================
+def evolve(psi):
+    psi *= expV
+    psi_k = np.fft.fft2(psi)
+    psi_k *= expK
+    psi[:] = np.fft.ifft2(psi_k)
+    psi *= expV
+    psi *= absorb
+    return psi
+
+# =========================================================
+# Visualization setup (cinematic)
+# =========================================================
+psi = psi0.copy()
+prob = np.zeros((Ny, Nx), dtype=np.float32)
+
+fig, ax = plt.subplots(figsize=(8, 8), facecolor="#111111")
+plt.subplots_adjust(bottom=0.18)
+fig.patch.set_facecolor("#111111")
+
+ax.set_facecolor("#111111")
+ax.tick_params(colors="white", labelsize=12)
+ax.set_xlabel("x", color="white", fontsize=14)
+ax.set_ylabel("y", color="white", fontsize=14)
+ax.set_title("Quantum Double-Slit Interference (2D)", color="white", fontsize=16)
+
+# Remove top/right spines
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+ax.spines["bottom"].set_color("white")
+ax.spines["left"].set_color("white")
+
+# Subtle grid
+ax.grid(color="gray", linestyle="--", linewidth=0.3, alpha=0.3)
+
+# Initialize probability image
+im = ax.imshow(
+    prob,
+    extent=[-Lx/2, Lx/2, -Ly/2, Ly/2],
+    origin="lower",
+    cmap="inferno",
+    vmin=0,
+    vmax=1,
+    interpolation="gaussian"  # smooth cinematic interpolation
+)
+
+# =========================================================
+# Animation loop
+# =========================================================
+steps_per_frame = 3
+
+def update(frame):
+    global psi, prob
+
+    for _ in range(steps_per_frame):
+        psi = evolve(psi)
+
+    np.abs(psi, out=prob)
+    prob **= 1.3  # enhance glow effect
+    prob = scipy.ndimage.gaussian_filter(prob, sigma=1.0)
+    prob /= prob.max() + 1e-12
+
+    im.set_data(prob)
+    return [im]
+
+# =========================================================
+# Restart button
+# =========================================================
+ax_restart = plt.axes([0.38, 0.05, 0.24, 0.08], facecolor="#222222")
+button = Button(ax_restart, "Restart", color="#333333", hovercolor="#444444")
+button.label.set_color("white")
+
+def restart(event):
+    global psi, prob
+    psi[:] = psi0
+    np.abs(psi, out=prob)
+    im.set_data(prob)
+
+button.on_clicked(restart)
+
+# =========================================================
+# Run animation
+# =========================================================
+ani = FuncAnimation(fig, update, interval=25, blit=True, cache_frame_data=False)
+plt.show()
