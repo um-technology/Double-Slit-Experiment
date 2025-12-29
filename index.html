@@ -1,13 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link rel="icon" href="data:;base64,=">
-  <meta charset="UTF-8">
-  <title>Quantum Double-Slit Simulation</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+<meta charset="UTF-8">
+<title>Quantum Double-Slit Simulation</title>
+<style>
+  body { margin: 0; background: #111; color: white; font-family: sans-serif; }
+  #canvas-container { display: flex; justify-content: center; align-items: center; height: 100vh; }
+</style>
 </head>
-<body style="margin:0; background:#111;">
+<body>
+<div id="canvas-container">
+  <canvas id="simCanvas" width="512" height="512"></canvas>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/fft.js@0.3.0/dist/fft.min.js"></script>
 <script src="sketch.js"></script>
 </body>
 </html>
-
