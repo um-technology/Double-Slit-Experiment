@@ -11,29 +11,41 @@ let field = new Float32Array(Nx * Ny);
 let field2 = new Float32Array(Nx * Ny);
 let vel = new Float32Array(Nx * Ny);
 
-// physical params
-const damping = 0.999;
-const speed = 0.32;
+let running = true;
+let measured = false;
 
-// source
-const sourceY = Math.floor(Ny * 0.75);
+let speed = 0.32;
+let damping = 0.999;
+let slitWidth = 6;
+let slitSep = 26;
+
+const sourceY = Math.floor(Ny * 0.78);
 const slitY = Math.floor(Ny * 0.5);
-const slitSep = 26;
-const slitWidth = 6;
 
-// time
 let t = 0;
 
-// -----------------------------------
-// Utility
-// -----------------------------------
+// ------------------ UI ------------------
+document.getElementById("speed").oninput = e => speed = +e.target.value;
+document.getElementById("damping").oninput = e => damping = +e.target.value;
+document.getElementById("slitWidth").oninput = e => slitWidth = +e.target.value;
+document.getElementById("slitSep").oninput = e => slitSep = +e.target.value;
+
+document.getElementById("pauseBtn").onclick = () => {
+  running = !running;
+  document.getElementById("pauseBtn").innerText = running ? "Pause" : "Play";
+};
+
+document.getElementById("resetBtn").onclick = reset;
+document.getElementById("measureBtn").onclick = () => measured = true;
+
+let palette = "inferno";
+document.getElementById("palette").onchange = e => palette = e.target.value;
+
+// ------------------ Helpers ------------------
 function idx(x, y) {
   return x + y * Nx;
 }
 
-// -----------------------------------
-// Draw barrier with slits
-// -----------------------------------
 function isBarrier(x, y) {
   if (Math.abs(y - slitY) > 1) return false;
 
@@ -43,9 +55,7 @@ function isBarrier(x, y) {
   return true;
 }
 
-// -----------------------------------
-// Simulation step
-// -----------------------------------
+// ------------------ Physics ------------------
 function step() {
   for (let y = 1; y < Ny - 1; y++) {
     for (let x = 1; x < Nx - 1; x++) {
@@ -70,43 +80,55 @@ function step() {
     }
   }
 
-  // swap buffers
   [field, field2] = [field2, field];
 }
 
-// -----------------------------------
-// Source injection (plane wave)
-// -----------------------------------
 function source() {
+  if (measured) return;
   for (let x = 0; x < Nx; x++) {
-    field[idx(x, sourceY)] += Math.sin(t * 0.25) * 0.9;
+    field[idx(x, sourceY)] += Math.sin(t * 0.25) * 0.8;
   }
 }
 
-// -----------------------------------
-// Color mapping (professional glow)
-// -----------------------------------
-function colorMap(v) {
-  v = Math.abs(v);
-  v = Math.min(1, v * 1.6);
-
-  // cinematic curve
-  v = Math.pow(v, 0.45);
-
-  const r = Math.min(255, 40 + v * 240);
-  const g = Math.min(255, 30 + v * 140);
-  const b = Math.min(255, 80 + v * 255);
-
-  return [r, g, b];
+// ------------------ Measurement collapse ------------------
+function collapse() {
+  for (let i = 0; i < field.length; i++) {
+    field[i] = Math.random() < Math.abs(field[i]) * 0.5 ? field[i] : 0;
+  }
 }
 
-// -----------------------------------
-// Render
-// -----------------------------------
+// ------------------ Color mapping ------------------
+function colormap(v) {
+  v = Math.abs(v);
+  v = Math.min(1, v * 1.4);
+  v = Math.pow(v, 0.45);
+
+  if (palette === "plasma")
+    return [255 * v, 120 + 100 * v, 255 * (1 - v)];
+
+  if (palette === "blue")
+    return [50 * v, 120 * v, 255];
+
+  if (palette === "classic")
+    return [255 * v, 255 * v, 255 * v];
+
+  // inferno
+  return [
+    40 + 215 * v,
+    30 + 120 * v,
+    80 + 180 * v
+  ];
+}
+
+// ------------------ Render ------------------
 function render() {
-  step();
-  source();
-  t++;
+  if (running) {
+    step();
+    source();
+    t++;
+  }
+
+  if (measured) collapse();
 
   const img = ctx.createImageData(W, H);
   const sx = W / Nx;
@@ -115,15 +137,15 @@ function render() {
   for (let y = 0; y < Ny; y++) {
     for (let x = 0; x < Nx; x++) {
       const v = field[idx(x, y)];
-      const [r, g, b] = colorMap(v);
+      const [r, g, b] = colormap(v);
 
       for (let py = 0; py < sy; py++) {
         for (let px = 0; px < sx; px++) {
-          const X = Math.floor(x * sx + px);
-          const Y = Math.floor(y * sy + py);
+          const X = (x * sx + px) | 0;
+          const Y = (y * sy + py) | 0;
           const i = (Y * W + X) * 4;
 
-          img.data[i]     = r;
+          img.data[i] = r;
           img.data[i + 1] = g;
           img.data[i + 2] = b;
           img.data[i + 3] = 255;
@@ -136,6 +158,15 @@ function render() {
   requestAnimationFrame(render);
 }
 
+// ------------------ Reset ------------------
+function reset() {
+  field.fill(0);
+  field2.fill(0);
+  vel.fill(0);
+  measured = false;
+}
+
+// Start
 render();
 
 
