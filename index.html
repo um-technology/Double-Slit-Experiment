@@ -1,107 +1,22 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8" />
-<title>Quantum Double Slit</title>
-<link rel="icon" href="data:,">
-
-<style>
-html, body {
-  margin: 0;
-  background: radial-gradient(circle at top, #1a1f2c, #050608);
-  color: #eee;
-  font-family: system-ui, sans-serif;
-  overflow: hidden;
-}
-
-/* CANVAS LAYER */
-canvas {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 1;
-  display: block;
-}
-
-/* UI PANEL */
-#panel {
-  position: fixed;
-  top: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(20,20,30,0.85);
-  padding: 14px 18px;
-  border-radius: 14px;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 0 25px rgba(0,0,0,.45);
-  z-index: 10;
-  pointer-events: auto;
-}
-
-#title {
-  font-size: 18px;
-  font-weight: 600;
-  margin-bottom: 8px;
-  text-align: center;
-}
-
-.controls {
-  display: grid;
-  grid-template-columns: auto 140px;
-  gap: 6px 10px;
-  font-size: 12px;
-  align-items: center;
-}
-
-input, select, button {
-  background: #222;
-  color: white;
-  border: 1px solid #444;
-  border-radius: 6px;
-  padding: 4px 6px;
-  pointer-events: auto;
-}
-
-button {
-  cursor: pointer;
-}
-
-button:hover {
-  background: #333;
-}
-</style>
+  <meta charset="UTF-8">
+  <title>Double Slit</title>
+  <style>
+    body {
+      margin: 0;
+      background: black;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
 </head>
-
 <body>
-
-<div id="panel">
-  <div id="title">Quantum Double-Slit Interference</div>
-
-  <div class="controls">
-    <label>Slit Width</label><input id="slitWidth" type="range" min="2" max="20" value="6">
-    <label>Slit Separation</label><input id="slitSep" type="range" min="10" max="60" value="26">
-    <label>Wave Speed</label><input id="speed" type="range" min="0.05" max="1" step="0.01" value="0.32">
-    <label>Damping</label><input id="damping" type="range" min="0.95" max="1" step="0.0005" value="0.999">
-
-    <label>Colormap</label>
-    <select id="palette">
-      <option value="inferno">Inferno</option>
-      <option value="plasma">Plasma</option>
-      <option value="blue">Blue</option>
-      <option value="classic">Classic</option>
-    </select>
-
-    <button id="pauseBtn" type="button">Pause</button>
-    <button id="resetBtn" type="button">Reset</button>
-    <button id="measureBtn" type="button">Measure</button>
-  </div>
-</div>
-
-<canvas id="c" width="600" height="600"></canvas>
-
+<canvas id="c"></canvas>
 <script src="sketch.js"></script>
 </body>
 </html>
-
 
