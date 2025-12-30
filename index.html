@@ -1,19 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Quantum Double-Slit Simulation</title>
-<style>
+  <meta charset="UTF-8" />
+  <title>Quantum Double Slit</title>
+
+  <!-- Disable favicon lookup -->
   <link rel="icon" href="data:;base64,=">
-  body { margin: 0; background: #111; color: white; font-family: sans-serif; }
-  #canvas-container { display: flex; justify-content: center; align-items: center; height: 100vh; }
-</style>
+
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      overflow: hidden;
+    }
+  </style>
 </head>
 <body>
-<div id="canvas-container">
-  <canvas id="simCanvas" width="512" height="512"></canvas>
-</div>
+
+<canvas id="simCanvas" width="512" height="512"></canvas>
+
+<!-- FFT library MUST come first -->
 <script src="https://cdn.jsdelivr.net/npm/fft.js@0.3.0/dist/fft.min.js"></script>
+
+<!-- Your simulation -->
 <script src="sketch.js"></script>
+
 </body>
 </html>
