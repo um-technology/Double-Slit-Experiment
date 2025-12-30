@@ -1,144 +1,89 @@
-// Quantum Double-Slit Simulation in JS
-
-const Nx = 512;
-const Ny = 512;
-const Lx = 10.0;
-const Ly = 10.0;
-const dt = 0.002;
-const hbar = 1.0;
-const m = 1.0;
-
-const canvas = document.getElementById("simCanvas");
+const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
-const imageData = ctx.createImageData(Nx, Ny);
 
-const x = new Float32Array(Nx);
-const y = new Float32Array(Ny);
-for (let i = 0; i < Nx; i++) x[i] = -Lx / 2 + i * (Lx / Nx);
-for (let i = 0; i < Ny; i++) y[i] = -Ly / 2 + i * (Ly / Ny);
+const W = 700;
+const H = 700;
+canvas.width = W;
+canvas.height = H;
 
-// Potential: double slit
-const V = new Float32Array(Nx * Ny);
-const barrier_y = 0.0;
-const thickness = 0.2;
-const slit_sep = 1.5;
-const slit_width = 0.3;
+// ========================
+// Slit configuration
+// ========================
+const slitY = H * 0.45;
+const slitGap = 100;
+const slitWidth = 16;
 
-for (let i = 0; i < Ny; i++) {
-  for (let j = 0; j < Nx; j++) {
-    if (Math.abs(y[i] - barrier_y) < thickness) {
-      if (
-        !(
-          Math.abs(x[j] - slit_sep / 2) < slit_width ||
-          Math.abs(x[j] + slit_sep / 2) < slit_width
-        )
-      ) {
-        V[i * Nx + j] = 1e4;
-      }
-    }
+// Wave parameters
+let time = 0;
+const k = 0.15;
+const speed = 0.15;
+
+// Precompute pixel list
+const pixels = [];
+for (let y = 0; y < H; y++) {
+  for (let x = 0; x < W; x++) {
+    pixels.push({ x, y });
   }
 }
 
-// Absorbing boundary
-const absorb = new Float32Array(Nx * Ny).fill(1);
-const edge = Math.floor(0.08 * Nx);
-for (let i = 0; i < Ny; i++) {
-  for (let j = 0; j < Nx; j++) {
-    const di = Math.min(i, Ny - i - 1);
-    const dj = Math.min(j, Nx - j - 1);
-    const d = Math.min(di, dj);
-    if (d < edge) absorb[i * Nx + j] = Math.exp(-1 * (((edge - d) / edge) ** 2) * 4);
-  }
+// ========================
+// Wave function
+// ========================
+function wave(x, y, sx, sy, k, t) {
+  const dx = x - sx;
+  const dy = y - sy;
+  const r = Math.sqrt(dx * dx + dy * dy);
+  return Math.sin(k * r - t) / (1 + 0.015 * r);
 }
 
-// Initial Gaussian wavepacket
-const kx = 0.0,
-  ky = 15.0;
-const sigma = 0.35;
-
-const psiRe = new Float32Array(Nx * Ny);
-const psiIm = new Float32Array(Nx * Ny);
-
-for (let i = 0; i < Ny; i++) {
-  for (let j = 0; j < Nx; j++) {
-    const idx = i * Nx + j;
-    const g = Math.exp(-((x[j] ** 2 + (y[i] + 3) ** 2) / (2 * sigma ** 2)));
-    psiRe[idx] = g * Math.cos(kx * x[j] + ky * y[i]);
-    psiIm[idx] = g * Math.sin(kx * x[j] + ky * y[i]);
-  }
-}
-
-// FFT precompute (row-wise)
-const kVals = new Float32Array(Nx);
-for (let i = 0; i < Nx; i++) {
-  kVals[i] = (2 * Math.PI * (i < Nx / 2 ? i : i - Nx)) / Lx;
-}
-
-// Split-step evolution
-function evolve() {
-  // Half-step potential
-  for (let i = 0; i < Nx * Ny; i++) {
-    const theta = -V[i] * dt / (2 * hbar);
-    const re = psiRe[i],
-      im = psiIm[i];
-    psiRe[i] = re * Math.cos(theta) - im * Math.sin(theta);
-    psiIm[i] = re * Math.sin(theta) + im * Math.cos(theta);
-  }
-
-  // Kinetic full-step (row-wise FFT)
-  for (let i = 0; i < Ny; i++) {
-    const rowRe = psiRe.slice(i * Nx, (i + 1) * Nx);
-    const rowIm = psiIm.slice(i * Nx, (i + 1) * Nx);
-
-    // 1D FFT (using fft.js)
-    const fft = new FFT(Nx);
-    fft.transform(rowRe, rowIm);
-
-    for (let j = 0; j < Nx; j++) {
-      const k2 = kVals[j] ** 2;
-      const phase = -hbar * k2 * dt / (2 * m);
-      const re = rowRe[j],
-        im = rowIm[j];
-      rowRe[j] = re * Math.cos(phase) - im * Math.sin(phase);
-      rowIm[j] = re * Math.sin(phase) + im * Math.cos(phase);
-    }
-
-    fft.inverseTransform(rowRe, rowIm);
-
-    for (let j = 0; j < Nx; j++) {
-      psiRe[i * Nx + j] = rowRe[j] / Nx;
-      psiIm[i * Nx + j] = rowIm[j] / Nx;
-    }
-  }
-
-  // Half-step potential + absorb
-  for (let i = 0; i < Nx * Ny; i++) {
-    const theta = -V[i] * dt / (2 * hbar);
-    const re = psiRe[i],
-      im = psiIm[i];
-    psiRe[i] = (re * Math.cos(theta) - im * Math.sin(theta)) * absorb[i];
-    psiIm[i] = (re * Math.sin(theta) + im * Math.cos(theta)) * absorb[i];
-  }
-}
-
+// ========================
 // Render loop
+// ========================
 function render() {
-  evolve();
-  for (let i = 0; i < Ny; i++) {
-    for (let j = 0; j < Nx; j++) {
-      const idx = i * Nx + j;
-      const p = Math.sqrt(psiRe[idx] ** 2 + psiIm[idx] ** 2) ** 1.3;
-      const c = Math.min(255, Math.floor(p * 500));
-      const pix = (i * Nx + j) * 4;
-      imageData.data[pix] = c;
-      imageData.data[pix + 1] = Math.floor(c * 0.2);
-      imageData.data[pix + 2] = 0;
-      imageData.data[pix + 3] = 255;
+  const img = ctx.createImageData(W, H);
+  const data = img.data;
+
+  time += speed;
+
+  for (let i = 0; i < pixels.length; i++) {
+    const { x, y } = pixels[i];
+    const idx = i * 4;
+
+    // Barrier
+    if (
+      Math.abs(y - slitY) < 5 &&
+      !(
+        Math.abs(x - W / 2 - slitGap / 2) < slitWidth ||
+        Math.abs(x - W / 2 + slitGap / 2) < slitWidth
+      )
+    ) {
+      data[idx] = 40;
+      data[idx + 1] = 40;
+      data[idx + 2] = 40;
+      data[idx + 3] = 255;
+      continue;
     }
+
+    // Two coherent wave sources
+    let v = 0;
+    v += wave(x, y, W / 2 - slitGap / 2, slitY, k, time);
+    v += wave(x, y, W / 2 + slitGap / 2, slitY, k, time);
+
+    v = Math.abs(v);
+    v = Math.pow(v, 1.25);
+
+    const glow = Math.min(255, v * 255);
+
+    data[idx]     = glow;
+    data[idx + 1] = glow * 0.4;
+    data[idx + 2] = 0;
+    data[idx + 3] = 255;
   }
-  ctx.putImageData(imageData, 0, 0);
+
+  ctx.putImageData(img, 0, 0);
   requestAnimationFrame(render);
 }
 
 render();
+
 
