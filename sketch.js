@@ -1,83 +1,135 @@
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
-const W = 700;
-const H = 700;
-canvas.width = W;
-canvas.height = H;
+const W = canvas.width;
+const H = canvas.height;
 
-// ========================
-// Slit configuration
-// ========================
-const slitY = H * 0.45;
-const slitGap = 100;
-const slitWidth = 16;
+const Nx = 220;
+const Ny = 220;
 
-// Wave parameters
-let time = 0;
-const k = 0.15;
-const speed = 0.15;
+let field = new Float32Array(Nx * Ny);
+let field2 = new Float32Array(Nx * Ny);
+let vel = new Float32Array(Nx * Ny);
 
-// Precompute pixel list
-const pixels = [];
-for (let y = 0; y < H; y++) {
-  for (let x = 0; x < W; x++) {
-    pixels.push({ x, y });
+// physical params
+const damping = 0.999;
+const speed = 0.32;
+
+// source
+const sourceY = Math.floor(Ny * 0.75);
+const slitY = Math.floor(Ny * 0.5);
+const slitSep = 26;
+const slitWidth = 6;
+
+// time
+let t = 0;
+
+// -----------------------------------
+// Utility
+// -----------------------------------
+function idx(x, y) {
+  return x + y * Nx;
+}
+
+// -----------------------------------
+// Draw barrier with slits
+// -----------------------------------
+function isBarrier(x, y) {
+  if (Math.abs(y - slitY) > 1) return false;
+
+  if (Math.abs(x - (Nx / 2 - slitSep)) < slitWidth) return false;
+  if (Math.abs(x - (Nx / 2 + slitSep)) < slitWidth) return false;
+
+  return true;
+}
+
+// -----------------------------------
+// Simulation step
+// -----------------------------------
+function step() {
+  for (let y = 1; y < Ny - 1; y++) {
+    for (let x = 1; x < Nx - 1; x++) {
+
+      if (isBarrier(x, y)) {
+        field[idx(x, y)] = 0;
+        continue;
+      }
+
+      const i = idx(x, y);
+
+      const lap =
+        field[idx(x - 1, y)] +
+        field[idx(x + 1, y)] +
+        field[idx(x, y - 1)] +
+        field[idx(x, y + 1)] -
+        4 * field[i];
+
+      vel[i] += lap * speed;
+      vel[i] *= damping;
+      field2[i] = field[i] + vel[i];
+    }
+  }
+
+  // swap buffers
+  [field, field2] = [field2, field];
+}
+
+// -----------------------------------
+// Source injection (plane wave)
+// -----------------------------------
+function source() {
+  for (let x = 0; x < Nx; x++) {
+    field[idx(x, sourceY)] += Math.sin(t * 0.25) * 0.9;
   }
 }
 
-// ========================
-// Wave function
-// ========================
-function wave(x, y, sx, sy, k, t) {
-  const dx = x - sx;
-  const dy = y - sy;
-  const r = Math.sqrt(dx * dx + dy * dy);
-  return Math.sin(k * r - t) / (1 + 0.015 * r);
+// -----------------------------------
+// Color mapping (professional glow)
+// -----------------------------------
+function colorMap(v) {
+  v = Math.abs(v);
+  v = Math.min(1, v * 1.6);
+
+  // cinematic curve
+  v = Math.pow(v, 0.45);
+
+  const r = Math.min(255, 40 + v * 240);
+  const g = Math.min(255, 30 + v * 140);
+  const b = Math.min(255, 80 + v * 255);
+
+  return [r, g, b];
 }
 
-// ========================
-// Render loop
-// ========================
+// -----------------------------------
+// Render
+// -----------------------------------
 function render() {
+  step();
+  source();
+  t++;
+
   const img = ctx.createImageData(W, H);
-  const data = img.data;
+  const sx = W / Nx;
+  const sy = H / Ny;
 
-  time += speed;
+  for (let y = 0; y < Ny; y++) {
+    for (let x = 0; x < Nx; x++) {
+      const v = field[idx(x, y)];
+      const [r, g, b] = colorMap(v);
 
-  for (let i = 0; i < pixels.length; i++) {
-    const { x, y } = pixels[i];
-    const idx = i * 4;
+      for (let py = 0; py < sy; py++) {
+        for (let px = 0; px < sx; px++) {
+          const X = Math.floor(x * sx + px);
+          const Y = Math.floor(y * sy + py);
+          const i = (Y * W + X) * 4;
 
-    // Barrier
-    if (
-      Math.abs(y - slitY) < 5 &&
-      !(
-        Math.abs(x - W / 2 - slitGap / 2) < slitWidth ||
-        Math.abs(x - W / 2 + slitGap / 2) < slitWidth
-      )
-    ) {
-      data[idx] = 40;
-      data[idx + 1] = 40;
-      data[idx + 2] = 40;
-      data[idx + 3] = 255;
-      continue;
+          img.data[i]     = r;
+          img.data[i + 1] = g;
+          img.data[i + 2] = b;
+          img.data[i + 3] = 255;
+        }
+      }
     }
-
-    // Two coherent wave sources
-    let v = 0;
-    v += wave(x, y, W / 2 - slitGap / 2, slitY, k, time);
-    v += wave(x, y, W / 2 + slitGap / 2, slitY, k, time);
-
-    v = Math.abs(v);
-    v = Math.pow(v, 1.25);
-
-    const glow = Math.min(255, v * 255);
-
-    data[idx]     = glow;
-    data[idx + 1] = glow * 0.4;
-    data[idx + 2] = 0;
-    data[idx + 3] = 255;
   }
 
   ctx.putImageData(img, 0, 0);
