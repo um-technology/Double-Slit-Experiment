@@ -1,94 +1,131 @@
 const canvas = document.getElementById("c");
 const ctx = canvas.getContext("2d");
 
-canvas.width = 800;
-canvas.height = 600;
-
 const W = canvas.width;
 const H = canvas.height;
 
-const NX = 240;
-const NY = 180;
+const Nx = 220;
+const Ny = 220;
 
-let u = new Float32Array(NX * NY);
-let uPrev = new Float32Array(NX * NY);
-let uNext = new Float32Array(NX * NY);
+let field = new Float32Array(Nx * Ny);
+let field2 = new Float32Array(Nx * Ny);
+let vel = new Float32Array(Nx * Ny);
 
+// physical params
 const damping = 0.999;
-const speed = 0.25;
+const speed = 0.32;
 
+// source
+const sourceY = Math.floor(Ny * 0.75);
+const slitY = Math.floor(Ny * 0.5);
+const slitSep = 26;
+const slitWidth = 6;
+
+// time
+let t = 0;
+
+// -----------------------------------
+// Utility
+// -----------------------------------
 function idx(x, y) {
-  return x + y * NX;
+  return x + y * Nx;
 }
 
-// Double slit barrier
-function isWall(x, y) {
-  const slitY = Math.floor(NY / 2);
-  const slitSep = 18;
-  const slitWidth = 6;
-
+// -----------------------------------
+// Draw barrier with slits
+// -----------------------------------
+function isBarrier(x, y) {
   if (Math.abs(y - slitY) > 1) return false;
 
-  if (Math.abs(x - (NX / 2 - slitSep)) < slitWidth) return false;
-  if (Math.abs(x - (NX / 2 + slitSep)) < slitWidth) return false;
+  if (Math.abs(x - (Nx / 2 - slitSep)) < slitWidth) return false;
+  if (Math.abs(x - (Nx / 2 + slitSep)) < slitWidth) return false;
 
   return true;
 }
 
+// -----------------------------------
+// Simulation step
+// -----------------------------------
 function step() {
-  for (let y = 1; y < NY - 1; y++) {
-    for (let x = 1; x < NX - 1; x++) {
+  for (let y = 1; y < Ny - 1; y++) {
+    for (let x = 1; x < Nx - 1; x++) {
 
-      if (isWall(x, y)) {
-        u[idx(x, y)] = 0;
+      if (isBarrier(x, y)) {
+        field[idx(x, y)] = 0;
         continue;
       }
 
       const i = idx(x, y);
 
       const lap =
-        u[idx(x - 1, y)] +
-        u[idx(x + 1, y)] +
-        u[idx(x, y - 1)] +
-        u[idx(x, y + 1)] -
-        4 * u[i];
+        field[idx(x - 1, y)] +
+        field[idx(x + 1, y)] +
+        field[idx(x, y - 1)] +
+        field[idx(x, y + 1)] -
+        4 * field[i];
 
-      uNext[i] = (2 * u[i] - uPrev[i]) + speed * lap;
-      uNext[i] *= damping;
+      vel[i] += lap * speed;
+      vel[i] *= damping;
+      field2[i] = field[i] + vel[i];
     }
   }
 
-  [uPrev, u, uNext] = [u, uNext, uPrev];
+  // swap buffers
+  [field, field2] = [field2, field];
 }
 
-let t = 0;
-
+// -----------------------------------
+// Source injection (plane wave)
+// -----------------------------------
 function source() {
-  const y = Math.floor(NY * 0.8);
-  for (let x = 0; x < NX; x++) {
-    u[idx(x, y)] += Math.sin(t * 0.15) * 0.6;
+  for (let x = 0; x < Nx; x++) {
+    field[idx(x, sourceY)] += Math.sin(t * 0.25) * 0.9;
   }
 }
 
-function draw() {
-  const img = ctx.createImageData(W, H);
-  const sx = W / NX;
-  const sy = H / NY;
+// -----------------------------------
+// Color mapping (professional glow)
+// -----------------------------------
+function colorMap(v) {
+  v = Math.abs(v);
+  v = Math.min(1, v * 1.6);
 
-  for (let y = 0; y < NY; y++) {
-    for (let x = 0; x < NX; x++) {
-      const v = Math.abs(u[idx(x, y)]);
-      const c = Math.min(255, v * 255 * 1.5);
+  // cinematic curve
+  v = Math.pow(v, 0.45);
+
+  const r = Math.min(255, 40 + v * 240);
+  const g = Math.min(255, 30 + v * 140);
+  const b = Math.min(255, 80 + v * 255);
+
+  return [r, g, b];
+}
+
+// -----------------------------------
+// Render
+// -----------------------------------
+function render() {
+  step();
+  source();
+  t++;
+
+  const img = ctx.createImageData(W, H);
+  const sx = W / Nx;
+  const sy = H / Ny;
+
+  for (let y = 0; y < Ny; y++) {
+    for (let x = 0; x < Nx; x++) {
+      const v = field[idx(x, y)];
+      const [r, g, b] = colorMap(v);
 
       for (let py = 0; py < sy; py++) {
         for (let px = 0; px < sx; px++) {
-          const X = (x * sx + px) | 0;
-          const Y = (y * sy + py) | 0;
+          const X = Math.floor(x * sx + px);
+          const Y = Math.floor(y * sy + py);
           const i = (Y * W + X) * 4;
 
-          img.data[i] = c;
-          img.data[i + 1] = 80;
-          img.data[i + 2] = 200;
+          img.data[i]     = r;
+          img.data[i + 1] = g;
+          img.data[i + 2] = b;
           img.data[i + 3] = 255;
         }
       }
@@ -96,16 +133,10 @@ function draw() {
   }
 
   ctx.putImageData(img, 0, 0);
+  requestAnimationFrame(render);
 }
 
-function loop() {
-  step();
-  source();
-  draw();
-  requestAnimationFrame(loop);
-}
-
-loop();
+render();
 
 
 
