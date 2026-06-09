@@ -197,9 +197,11 @@ function attachF1Hover() {
             const rect = chart.canvas.getBoundingClientRect();
             const xPixel = e.clientX - rect.left;
 
-            const xScale = chart.scales.x;
-            const indexFloat = xScale.getValueForPixel(xPixel);
-            const i = Math.floor(indexFloat);
+            const rect = chart.canvas.getBoundingClientRect();
+            const xPixel = e.clientX - rect.left;
+
+            const indexFloat = chart.scales.x.getValueForPixel(xPixel);
+            const i = Math.round(indexFloat);
 
             const t = telemetryData[i];
             if (!t) return;
@@ -244,13 +246,19 @@ function createOverlay() {
 // ========================
 // SYNCHRONIZED CURSOR
 // ========================
-function drawCursorAcrossCharts(xPixel) {
+function drawCursorAcrossCharts(index) {
     [speedChart, throttleChart, brakeChart, gearChart, rpmChart].forEach(chart => {
-        const { ctx, chartArea } = chart;
+        if (!chart) return;
 
-        chart.update("none");
+        const { ctx, chartArea, scales } = chart;
 
+        if (!chartArea) return;
+
+        const xPixel = scales.x.getPixelForValue(index);
+
+        // ❌ REMOVE chart.update() completely (THIS WAS THE BUG)
         ctx.save();
+
         ctx.strokeStyle = "rgba(255,255,255,0.25)";
         ctx.lineWidth = 1;
 
