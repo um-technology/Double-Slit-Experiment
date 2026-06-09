@@ -9,16 +9,29 @@ let rpmChart;
 
 let telemetryData = [];
 
+// 🚨 CACHE (fixes 429 + speeds everything up)
+let cachedPositions = null;
+
 // ========================
 // MAIN
 // ========================
-async function loadData() {
-    SESSION_KEY = document.getElementById("sessionKey").value;
-    DRIVER_NUMBER = document.getElementById("driverNumber").value;
+let loading = false;
 
-    await loadDriver();
-    await loadLaps();
-    await drawTrack();
+async function loadData() {
+    if (loading) return;
+    loading = true;
+
+    try {
+        SESSION_KEY = document.getElementById("sessionKey").value;
+        DRIVER_NUMBER = document.getElementById("driverNumber").value;
+
+        await loadDriver();
+        await loadLaps();
+        await drawTrack();
+
+    } finally {
+        loading = false;
+    }
 }
 
 // ========================
@@ -30,7 +43,9 @@ async function loadDriver() {
     );
 
     const data = await res.json();
-    const driver = data[0];
+    const driver = data?.[0];
+
+    if (!driver) return;
 
     document.getElementById("driverCard").innerHTML = `
         <h2>${driver.full_name}</h2>
@@ -48,7 +63,10 @@ async function loadLaps() {
     );
 
     const laps = await res.json();
+    if (!Array.isArray(laps)) return;
+
     const validLaps = laps.filter(l => l.lap_duration);
+    if (!validLaps.length) return;
 
     const fastest = validLaps.reduce((a, b) =>
         a.lap_duration < b.lap_duration ? a : b
@@ -72,7 +90,7 @@ async function loadLaps() {
 }
 
 // ========================
-// TELEMETRY FETCH
+// TELEMETRY
 // ========================
 async function loadTelemetry(lap) {
     const start = new Date(lap.date_start);
@@ -83,16 +101,25 @@ async function loadTelemetry(lap) {
     );
 
     telemetryData = await res.json();
+    if (!Array.isArray(telemetryData)) return;
 
     const labels = telemetryData.map((_, i) => i);
 
-    speedChart = createChart("speedChart", "Speed", smooth(telemetryData.map(x => x.speed)), "#00d4ff", labels);
-    throttleChart = createChart("throttleChart", "Throttle", smooth(telemetryData.map(x => x.throttle)), "#00ff88", labels);
-    brakeChart = createChart("brakeChart", "Brake", telemetryData.map(x => x.brake ? 100 : 0), "#ff4444", labels);
-    gearChart = createChart("gearChart", "Gear", telemetryData.map(x => x.n_gear), "#ffd000", labels);
-    rpmChart = createChart("rpmChart", "RPM", smooth(telemetryData.map(x => x.rpm)), "#b06cff", labels);
+    speedChart = createChart("speedChart", "Speed",
+        smooth(telemetryData.map(x => x.speed)), "#00d4ff", labels);
 
-    // IMPORTANT: attach hover AFTER charts exist
+    throttleChart = createChart("throttleChart", "Throttle",
+        smooth(telemetryData.map(x => x.throttle)), "#00ff88", labels);
+
+    brakeChart = createChart("brakeChart", "Brake",
+        telemetryData.map(x => x.brake ? 100 : 0), "#ff4444", labels);
+
+    gearChart = createChart("gearChart", "Gear",
+        telemetryData.map(x => x.n_gear), "#ffd000", labels);
+
+    rpmChart = createChart("rpmChart", "RPM",
+        smooth(telemetryData.map(x => x.rpm)), "#b06cff", labels);
+
     setTimeout(attachF1Hover, 200);
 }
 
@@ -115,7 +142,7 @@ function smooth(arr, window = 5) {
 }
 
 // ========================
-// CHART CREATION (FIXED)
+// CHARTS
 // ========================
 function createChart(canvasId, label, data, color, labels) {
     const chart = new Chart(document.getElementById(canvasId), {
@@ -135,16 +162,13 @@ function createChart(canvasId, label, data, color, labels) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-
             plugins: {
-                tooltip: { enabled: false } // 🔥 disable Chart.js tooltip (we replace it)
+                tooltip: { enabled: false }
             },
-
             interaction: {
                 mode: "nearest",
                 intersect: false
             },
-
             animation: {
                 duration: 150
             }
@@ -155,10 +179,10 @@ function createChart(canvasId, label, data, color, labels) {
 }
 
 // ========================
-// F1-STYLE HOVER SYSTEM
+// F1 HOVER SYSTEM
 // ========================
 function attachF1Hover() {
-    const canvases = [
+    const charts = [
         speedChart,
         throttleChart,
         brakeChart,
@@ -168,14 +192,13 @@ function attachF1Hover() {
 
     const overlay = createOverlay();
 
-    canvases.forEach(chart => {
+    charts.forEach(chart => {
         chart.canvas.addEventListener("mousemove", (e) => {
             const rect = chart.canvas.getBoundingClientRect();
             const xPixel = e.clientX - rect.left;
 
             const xScale = chart.scales.x;
             const indexFloat = xScale.getValueForPixel(xPixel);
-
             const i = Math.floor(indexFloat);
 
             const t = telemetryData[i];
@@ -184,8 +207,8 @@ function attachF1Hover() {
             drawCursorAcrossCharts(xPixel);
 
             overlay.innerHTML = `
-                <div><b>Speed:</b> ${t.speed} km/h</div>
-                <div><b>Throttle:</b> ${t.throttle}%</div>
+                <div><b>Speed:</b> ${t.speed}</div>
+                <div><b>Throttle:</b> ${t.throttle}</div>
                 <div><b>Brake:</b> ${t.brake ? "ON" : "OFF"}</div>
                 <div><b>Gear:</b> ${t.n_gear}</div>
                 <div><b>RPM:</b> ${t.rpm}</div>
@@ -195,16 +218,15 @@ function attachF1Hover() {
 }
 
 // ========================
-// SINGLE OVERLAY
+// OVERLAY
 // ========================
 function createOverlay() {
     let el = document.getElementById("telemetryOverlay");
-
     if (el) return el;
 
     el = document.createElement("div");
-
     el.id = "telemetryOverlay";
+
     el.style.position = "absolute";
     el.style.top = "20px";
     el.style.right = "20px";
@@ -216,7 +238,6 @@ function createOverlay() {
     el.style.pointerEvents = "none";
 
     document.body.appendChild(el);
-
     return el;
 }
 
@@ -243,43 +264,64 @@ function drawCursorAcrossCharts(xPixel) {
 }
 
 // ========================
-// TRACK
+// TRACK (FIXED + CACHED + 429 SAFE)
 // ========================
 async function drawTrack() {
-    const res = await fetch(
-        `https://api.openf1.org/v1/location?session_key=${SESSION_KEY}&driver_number=${DRIVER_NUMBER}`
-    );
+    try {
+        if (!cachedPositions) {
+            const res = await fetch(
+                `https://api.openf1.org/v1/location?session_key=${SESSION_KEY}&driver_number=${DRIVER_NUMBER}`
+            );
 
-    const positions = await res.json();
+            if (!res.ok) {
+                console.warn("Track API rate limited:", res.status);
+                return;
+            }
 
-    const canvas = document.getElementById("trackMap");
-    const ctx = canvas.getContext("2d");
+            const data = await res.json();
 
-    canvas.width = 1000;
-    canvas.height = 500;
+            if (!Array.isArray(data)) {
+                console.warn("Invalid track response:", data);
+                return;
+            }
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+            cachedPositions = data;
+        }
 
-    const xs = positions.map(p => p.x);
-    const ys = positions.map(p => p.y);
+        const positions = cachedPositions;
 
-    const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
-    const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
+        const canvas = document.getElementById("trackMap");
+        const ctx = canvas.getContext("2d");
 
-    ctx.strokeStyle = "#e10600";
-    ctx.lineWidth = 2;
+        canvas.width = 1000;
+        canvas.height = 500;
 
-    ctx.beginPath();
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    positions.forEach((p, i) => {
-        const x = ((p.x - minX) / (maxX - minX)) * 900 + 50;
-        const y = ((p.y - minY) / (maxY - minY)) * 400 + 50;
+        const xs = positions.map(p => p.x);
+        const ys = positions.map(p => p.y);
 
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-    });
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
 
-    ctx.stroke();
+        ctx.strokeStyle = "#e10600";
+        ctx.lineWidth = 2;
+
+        ctx.beginPath();
+
+        positions.forEach((p, i) => {
+            const x = ((p.x - minX) / (maxX - minX)) * 900 + 50;
+            const y = ((p.y - minY) / (maxY - minY)) * 400 + 50;
+
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+
+        ctx.stroke();
+
+    } catch (err) {
+        console.error("Track error:", err);
+    }
 }
