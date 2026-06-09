@@ -8,15 +8,13 @@ let gearChart;
 let rpmChart;
 
 let telemetryData = [];
-
-// 🚨 CACHE (fixes 429 + speeds everything up)
 let cachedPositions = null;
+
+let loading = false;
 
 // ========================
 // MAIN
 // ========================
-let loading = false;
-
 async function loadData() {
     if (loading) return;
     loading = true;
@@ -43,7 +41,7 @@ async function loadDriver() {
     );
 
     const data = await res.json();
-    const driver = data?.[0];
+    const driver = Array.isArray(data) ? data[0] : null;
 
     if (!driver) return;
 
@@ -77,14 +75,9 @@ async function loadLaps() {
 
     document.getElementById("position").innerText = "P1";
 
-    document.getElementById("s1").innerText =
-        fastest.duration_sector_1 || "--";
-
-    document.getElementById("s2").innerText =
-        fastest.duration_sector_2 || "--";
-
-    document.getElementById("s3").innerText =
-        fastest.duration_sector_3 || "--";
+    document.getElementById("s1").innerText = fastest.duration_sector_1 || "--";
+    document.getElementById("s2").innerText = fastest.duration_sector_2 || "--";
+    document.getElementById("s3").innerText = fastest.duration_sector_3 || "--";
 
     await loadTelemetry(fastest);
 }
@@ -101,7 +94,7 @@ async function loadTelemetry(lap) {
     );
 
     telemetryData = await res.json();
-    if (!Array.isArray(telemetryData)) return;
+    if (!Array.isArray(telemetryData) || telemetryData.length === 0) return;
 
     const labels = telemetryData.map((_, i) => i);
 
@@ -120,7 +113,7 @@ async function loadTelemetry(lap) {
     rpmChart = createChart("rpmChart", "RPM",
         smooth(telemetryData.map(x => x.rpm)), "#b06cff", labels);
 
-    setTimeout(attachF1Hover, 200);
+    setTimeout(initF1HoverSystem, 150);
 }
 
 // ========================
@@ -128,7 +121,8 @@ async function loadTelemetry(lap) {
 // ========================
 function smooth(arr, window = 5) {
     return arr.map((_, i) => {
-        let sum = 0, count = 0;
+        let sum = 0;
+        let count = 0;
 
         for (let j = -window; j <= window; j++) {
             if (arr[i + j] != null) {
@@ -142,10 +136,10 @@ function smooth(arr, window = 5) {
 }
 
 // ========================
-// CHARTS
+// CHART CREATION
 // ========================
 function createChart(canvasId, label, data, color, labels) {
-    const chart = new Chart(document.getElementById(canvasId), {
+    return new Chart(document.getElementById(canvasId), {
         type: "line",
         data: {
             labels,
@@ -162,26 +156,27 @@ function createChart(canvasId, label, data, color, labels) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+
             plugins: {
                 tooltip: { enabled: false }
             },
+
             interaction: {
                 mode: "nearest",
                 intersect: false
             },
+
             animation: {
-                duration: 150
+                duration: 120
             }
         }
     });
-
-    return chart;
 }
 
 // ========================
-// F1 HOVER SYSTEM
+// F1 HOVER SYSTEM (FIXED)
 // ========================
-function attachF1Hover() {
+function initF1HoverSystem() {
     const charts = [
         speedChart,
         throttleChart,
@@ -194,14 +189,12 @@ function attachF1Hover() {
 
     charts.forEach(chart => {
         chart.canvas.addEventListener("mousemove", (e) => {
-            const rect = chart.canvas.getBoundingClientRect();
-            const xPixel = e.clientX - rect.left;
 
             const rect = chart.canvas.getBoundingClientRect();
             const xPixel = e.clientX - rect.left;
 
             const indexFloat = chart.scales.x.getValueForPixel(xPixel);
-            const i = Math.round(indexFloat);
+            const i = Math.max(0, Math.min(telemetryData.length - 1, Math.floor(indexFloat)));
 
             const t = telemetryData[i];
             if (!t) return;
@@ -229,34 +222,34 @@ function createOverlay() {
     el = document.createElement("div");
     el.id = "telemetryOverlay";
 
-    el.style.position = "absolute";
-    el.style.top = "20px";
-    el.style.right = "20px";
-    el.style.background = "rgba(0,0,0,0.7)";
-    el.style.color = "white";
-    el.style.padding = "10px";
-    el.style.fontFamily = "monospace";
-    el.style.borderRadius = "8px";
-    el.style.pointerEvents = "none";
+    Object.assign(el.style, {
+        position: "absolute",
+        top: "20px",
+        right: "20px",
+        background: "rgba(0,0,0,0.75)",
+        color: "white",
+        padding: "10px",
+        fontFamily: "monospace",
+        borderRadius: "8px",
+        pointerEvents: "none"
+    });
 
     document.body.appendChild(el);
     return el;
 }
 
 // ========================
-// SYNCHRONIZED CURSOR
+// SYNCHRONIZED CURSOR (NO STRETCH BUG)
 // ========================
 function drawCursorAcrossCharts(index) {
     [speedChart, throttleChart, brakeChart, gearChart, rpmChart].forEach(chart => {
         if (!chart) return;
 
         const { ctx, chartArea, scales } = chart;
-
         if (!chartArea) return;
 
         const xPixel = scales.x.getPixelForValue(index);
 
-        // ❌ REMOVE chart.update() completely (THIS WAS THE BUG)
         ctx.save();
 
         ctx.strokeStyle = "rgba(255,255,255,0.25)";
@@ -272,7 +265,7 @@ function drawCursorAcrossCharts(index) {
 }
 
 // ========================
-// TRACK (FIXED + CACHED + 429 SAFE)
+// TRACK (CACHED + SAFE)
 // ========================
 async function drawTrack() {
     try {
@@ -281,17 +274,10 @@ async function drawTrack() {
                 `https://api.openf1.org/v1/location?session_key=${SESSION_KEY}&driver_number=${DRIVER_NUMBER}`
             );
 
-            if (!res.ok) {
-                console.warn("Track API rate limited:", res.status);
-                return;
-            }
+            if (!res.ok) return;
 
             const data = await res.json();
-
-            if (!Array.isArray(data)) {
-                console.warn("Invalid track response:", data);
-                return;
-            }
+            if (!Array.isArray(data)) return;
 
             cachedPositions = data;
         }
@@ -333,3 +319,8 @@ async function drawTrack() {
         console.error("Track error:", err);
     }
 }
+
+// ========================
+// GLOBAL EXPORT (IMPORTANT FOR HTML BUTTONS)
+// ========================
+window.loadData = loadData;
