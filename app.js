@@ -190,25 +190,25 @@ function initF1HoverSystem() {
     charts.forEach(chart => {
         chart.canvas.addEventListener("mousemove", (e) => {
 
-            const rect = chart.canvas.getBoundingClientRect();
-            const xPixel = e.clientX - rect.left;
+    const rect = chart.canvas.getBoundingClientRect(); // ✅ ONLY ONCE
+    const xPixel = e.clientX - rect.left;
 
-            const indexFloat = chart.scales.x.getValueForPixel(xPixel);
-            const i = Math.max(0, Math.min(telemetryData.length - 1, Math.floor(indexFloat)));
+    const indexFloat = chart.scales.x.getValueForPixel(xPixel);
+    const i = Math.max(0, Math.min(telemetryData.length - 1, Math.floor(indexFloat)));
 
-            const t = telemetryData[i];
-            if (!t) return;
+    const t = telemetryData[i];
+    if (!t) return;
 
-            drawCursorAcrossCharts(i);
+    drawCursorAcrossCharts(i);
 
-            overlay.innerHTML = `
-                <div><b>Speed:</b> ${t.speed}</div>
-                <div><b>Throttle:</b> ${t.throttle}</div>
-                <div><b>Brake:</b> ${t.brake ? "ON" : "OFF"}</div>
-                <div><b>Gear:</b> ${t.n_gear}</div>
-                <div><b>RPM:</b> ${t.rpm}</div>
-            `;
-        });
+    overlay.innerHTML = `
+        <div><b>Speed:</b> ${t.speed}</div>
+        <div><b>Throttle:</b> ${t.throttle}</div>
+        <div><b>Brake:</b> ${t.brake ? "ON" : "OFF"}</div>
+        <div><b>Gear:</b> ${t.n_gear}</div>
+        <div><b>RPM:</b> ${t.rpm}</div>
+    `;
+});
     });
 }
 
