@@ -1,0 +1,112 @@
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    background:#0b0d12;
+    color:white;
+    font-family:Inter,Arial,sans-serif;
+}
+
+.container{
+    width:95%;
+    max-width:1400px;
+    margin:auto;
+    padding:30px;
+}
+
+header{
+    margin-bottom:30px;
+}
+
+h1{
+    color:#e10600;
+    margin-bottom:20px;
+}
+
+.search-box{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+}
+
+input{
+    padding:12px;
+    border:none;
+    border-radius:10px;
+    background:#151922;
+    color:white;
+    width:220px;
+}
+
+button{
+    padding:12px 18px;
+    border:none;
+    border-radius:10px;
+    background:#e10600;
+    color:white;
+    cursor:pointer;
+    font-weight:bold;
+}
+
+button:hover{
+    opacity:.9;
+}
+
+.card{
+    background:#151922;
+    margin-bottom:25px;
+    border-radius:18px;
+    padding:20px;
+    box-shadow:
+    0 4px 25px rgba(0,0,0,.3);
+}
+
+.stats{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:20px;
+}
+
+.stat-card{
+    text-align:center;
+}
+
+.stat-card span{
+    display:block;
+    font-size:32px;
+    font-weight:bold;
+    margin-top:10px;
+}
+
+.sector-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:20px;
+}
+
+.sector{
+    text-align:center;
+    padding:20px;
+    background:#1c2230;
+    border-radius:12px;
+}
+
+.sector span{
+    display:block;
+    margin-top:10px;
+    font-size:24px;
+    font-weight:bold;
+}
+
+canvas{
+    width:100%;
+}
+
+#trackMap{
+    height:500px;
+    background:#0f131d;
+    border-radius:10px;
+}
