@@ -1,63 +1,207 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8" />
-<title>Quantum Double-Slit Simulation</title>
+  <meta charset="UTF-8">
+  <title>F1 Telemetry Viewer</title>
 
-<link rel="icon" href="data:,">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<style>
-html, body {
-  margin: 0;
-  padding: 0;
-  background: radial-gradient(circle at top, #1b1f2a, #050608);
-  color: #ddd;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  height: 100%;
-  overflow: hidden;
-}
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1400px;
+      margin: 20px auto;
+      padding: 20px;
+      background: #111;
+      color: white;
+    }
 
-#ui {
-  position: fixed;
-  top: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  text-align: center;
-  pointer-events: none;
-}
+    select {
+      padding: 8px;
+      margin-bottom: 20px;
+      font-size: 16px;
+    }
 
-#title {
-  font-size: 22px;
-  letter-spacing: 0.06em;
-  font-weight: 600;
-  color: #eaeaf0;
-}
+    .chart-container {
+      height: 300px;
+      margin-bottom: 40px;
+    }
 
-#subtitle {
-  font-size: 13px;
-  opacity: 0.7;
-}
-
-canvas {
-  display: block;
-  margin: auto;
-  box-shadow:
-    0 0 30px rgba(255,120,40,0.25),
-    inset 0 0 30px rgba(0,0,0,0.6);
-  border-radius: 10px;
-}
-</style>
+    h1 {
+      color: #ff1801;
+    }
+  </style>
 </head>
-
 <body>
 
-<div id="ui">
-  <div id="title">Quantum Double-Slit Interference</div>
-  <div id="subtitle">2D Wave Propagation Simulation</div>
+<h1>F1 Telemetry Viewer</h1>
+
+<p>
+Session: Singapore GP 2023 Qualifying<br>
+Driver: George Russell (#63)
+</p>
+
+<label>Select Lap:</label>
+<select id="lapSelect"></select>
+
+<div class="chart-container">
+  <canvas id="speedChart"></canvas>
 </div>
 
-<canvas id="c" width="512" height="512"></canvas>
+<div class="chart-container">
+  <canvas id="throttleChart"></canvas>
+</div>
 
-<script src="sketch.js"></script>
+<div class="chart-container">
+  <canvas id="brakeChart"></canvas>
+</div>
+
+<div class="chart-container">
+  <canvas id="gearChart"></canvas>
+</div>
+
+<script>
+
+const SESSION_KEY = 9519;
+const DRIVER_NUMBER = 63;
+
+let speedChart;
+let throttleChart;
+let brakeChart;
+let gearChart;
+
+async function loadLaps() {
+
+  const res = await fetch(
+    `https://api.openf1.org/v1/laps?session_key=${SESSION_KEY}&driver_number=${DRIVER_NUMBER}`
+  );
+
+  const laps = await res.json();
+
+  const select = document.getElementById("lapSelect");
+
+  laps.forEach(lap => {
+
+    if (!lap.lap_duration) return;
+
+    const option = document.createElement("option");
+
+    option.value = lap.lap_number;
+    option.textContent =
+      `Lap ${lap.lap_number} (${lap.lap_duration.toFixed(3)}s)`;
+
+    select.appendChild(option);
+  });
+
+  select.addEventListener("change", () => {
+    loadTelemetry(select.value);
+  });
+
+  if (laps.length > 0) {
+    loadTelemetry(laps[0].lap_number);
+  }
+}
+
+async function loadTelemetry(lapNumber) {
+
+  const lapRes = await fetch(
+    `https://api.openf1.org/v1/laps?session_key=${SESSION_KEY}&driver_number=${DRIVER_NUMBER}&lap_number=${lapNumber}`
+  );
+
+  const lapData = await lapRes.json();
+
+  if (!lapData.length) return;
+
+  const lap = lapData[0];
+
+  const start = new Date(lap.date_start);
+
+  const end = new Date(
+    start.getTime() + lap.lap_duration * 1000
+  );
+
+  const telemetryRes = await fetch(
+    `https://api.openf1.org/v1/car_data?session_key=${SESSION_KEY}&driver_number=${DRIVER_NUMBER}&date>=${start.toISOString()}&date<=${end.toISOString()}`
+  );
+
+  const telemetry = await telemetryRes.json();
+
+  const labels = telemetry.map((_, i) => i);
+
+  createOrUpdateChart(
+    "speedChart",
+    speedChart,
+    "Speed km/h",
+    labels,
+    telemetry.map(x => x.speed),
+    c => speedChart = c
+  );
+
+  createOrUpdateChart(
+    "throttleChart",
+    throttleChart,
+    "Throttle %",
+    labels,
+    telemetry.map(x => x.throttle),
+    c => throttleChart = c
+  );
+
+  createOrUpdateChart(
+    "brakeChart",
+    brakeChart,
+    "Brake",
+    labels,
+    telemetry.map(x => x.brake ? 100 : 0),
+    c => brakeChart = c
+  );
+
+  createOrUpdateChart(
+    "gearChart",
+    gearChart,
+    "Gear",
+    labels,
+    telemetry.map(x => x.n_gear),
+    c => gearChart = c
+  );
+}
+
+function createOrUpdateChart(
+  canvasId,
+  existing,
+  label,
+  labels,
+  data,
+  save
+) {
+
+  if (existing) {
+    existing.destroy();
+  }
+
+  const chart = new Chart(
+    document.getElementById(canvasId),
+    {
+      type: "line",
+      data: {
+        labels,
+        datasets: [{
+          label,
+          data
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false
+      }
+    }
+  );
+
+  save(chart);
+}
+
+loadLaps();
+
+</script>
+
 </body>
 </html>
