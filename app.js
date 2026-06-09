@@ -206,7 +206,7 @@ function attachF1Hover() {
             const t = telemetryData[i];
             if (!t) return;
 
-            drawCursorAcrossCharts(xPixel);
+            drawCursorAcrossCharts(i);
 
             overlay.innerHTML = `
                 <div><b>Speed:</b> ${t.speed}</div>
