@@ -122,12 +122,50 @@ async function loadDriver() {
     const el = document.getElementById("driverCard");
 
     if (el) {
-        el.innerHTML = `
-            <h2>${d.full_name || "Unknown"}</h2>
-            <p>${d.team_name || ""}</p>
-            <p>#${d.driver_number || ""}</p>
-        `;
-    }
+    el.innerHTML = `
+    <div class="driver-header">
+
+        <div class="driver-main">
+
+            <div class="driver-number">
+                #${d.driver_number}
+            </div>
+
+            <div>
+
+                <h2>${d.full_name}</h2>
+
+                <div class="driver-meta">
+                    ${d.name_acronym || ""}
+                    •
+                    ${d.team_name || "Unknown Team"}
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="driver-extra">
+
+            <div class="driver-stat">
+                <span>Nationality</span>
+                <strong>${d.country_code || "--"}</strong>
+            </div>
+
+            <div class="driver-stat">
+                <span>Session</span>
+                <strong>${SESSION_KEY}</strong>
+            </div>
+
+            <div class="driver-stat">
+                <span>Driver No.</span>
+                <strong>${d.driver_number}</strong>
+            </div>
+
+        </div>
+
+    </div>
+    `;
 }
 
 /* =========================================================
