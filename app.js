@@ -297,7 +297,7 @@ async function drawTrack() {
         `https://api.openf1.org/v1/location?session_key=${SESSION_KEY}&driver_number=${DRIVER_NUMBER}`
     );
 
-    if (!Array.isArray(positions) || positions.length < 5) {
+    if (!Array.isArray(positions) || positions.length < 10) {
         console.warn("No valid track data");
         return;
     }
@@ -307,7 +307,6 @@ async function drawTrack() {
 
     const ctx = canvas.getContext("2d");
 
-    // FIX: match real displayed size
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width;
     canvas.height = rect.height;
@@ -315,20 +314,13 @@ async function drawTrack() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     /* -----------------------------
-       FIX: define clean data properly
+       CLEAN DATA
     ------------------------------*/
     const clean = positions.filter(p =>
-        p &&
-        typeof p.x === "number" &&
-        typeof p.y === "number" &&
-        !isNaN(p.x) &&
-        !isNaN(p.y)
+        p && typeof p.x === "number" && typeof p.y === "number"
     );
 
-    if (clean.length < 5) {
-        console.warn("Track data invalid after filtering");
-        return;
-    }
+    if (clean.length < 10) return;
 
     const xs = clean.map(p => p.x);
     const ys = clean.map(p => p.y);
@@ -354,50 +346,111 @@ async function drawTrack() {
 
     const points = clean.map(p => ({
         x: scaleX(p.x),
-        y: scaleY(p.y)
+        y: scaleY(p.y),
+        speed: p.speed || 0
     }));
 
     /* -----------------------------
-       DRAW TRACK
+       SECTOR SPLITS
     ------------------------------*/
-    ctx.strokeStyle = "#444";
-    ctx.lineWidth = 8;
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
+    const s1End = Math.floor(points.length * 0.33);
+    const s2End = Math.floor(points.length * 0.66);
 
-    for (let i = 1; i < points.length; i++) {
-        ctx.lineTo(points[i].x, points[i].y);
-    }
-    ctx.stroke();
+    const drawSectorOverlay = (start, end, color, label) => {
 
-    ctx.strokeStyle = "#e10600";
-    ctx.lineWidth = 3;
-    ctx.shadowColor = "#e10600";
-    ctx.shadowBlur = 10;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 6;
+        ctx.globalAlpha = 0.15;
 
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
+        ctx.beginPath();
+        ctx.moveTo(points[start].x, points[start].y);
 
-    for (let i = 1; i < points.length; i++) {
-        ctx.lineTo(points[i].x, points[i].y);
-    }
-    ctx.stroke();
+        for (let i = start + 1; i <= end; i++) {
+            ctx.lineTo(points[i].x, points[i].y);
+        }
 
-    ctx.shadowBlur = 0;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+    };
+
+    drawSectorOverlay(0, s1End, "#00d4ff", "S1");
+    drawSectorOverlay(s1End, s2End, "#ffd000", "S2");
+    drawSectorOverlay(s2End, points.length - 1, "#ff4444", "S3");
 
     /* -----------------------------
-       START / END
+       SPEED HEATMAP LINE
     ------------------------------*/
-    const start = points[0];
-    const end = points[points.length - 1];
+    const maxSpeed = Math.max(...points.map(p => p.speed || 0)) || 1;
 
-    ctx.fillStyle = "#00ff88";
-    ctx.beginPath();
-    ctx.arc(start.x, start.y, 6, 0, Math.PI * 2);
-    ctx.fill();
+    for (let i = 1; i < points.length; i++) {
 
-    ctx.fillStyle = "#ff4444";
-    ctx.beginPath();
-    ctx.arc(end.x, end.y, 6, 0, Math.PI * 2);
-    ctx.fill();
+        const p1 = points[i - 1];
+        const p2 = points[i];
+
+        const speed = p2.speed || 0;
+        const t = speed / maxSpeed;
+
+        // green (fast) → red (slow)
+        const r = Math.floor(255 * (1 - t));
+        const g = Math.floor(255 * t);
+
+        ctx.strokeStyle = `rgb(${r},${g},80)`;
+        ctx.lineWidth = 3;
+
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+    }
+
+    /* -----------------------------
+       ANIMATED CAR DOT
+    ------------------------------*/
+    let i = 0;
+
+    function animateCar() {
+
+        if (i >= points.length) i = 0;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // redraw heatmap each frame
+        for (let j = 1; j < points.length; j++) {
+
+            const p1 = points[j - 1];
+            const p2 = points[j];
+
+            const speed = p2.speed || 0;
+            const t = speed / maxSpeed;
+
+            const r = Math.floor(255 * (1 - t));
+            const g = Math.floor(255 * t);
+
+            ctx.strokeStyle = `rgb(${r},${g},80)`;
+            ctx.lineWidth = 3;
+
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+        }
+
+        const p = points[i];
+
+        // moving car
+        ctx.fillStyle = "#ffffff";
+        ctx.shadowColor = "#00d4ff";
+        ctx.shadowBlur = 15;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.shadowBlur = 0;
+
+        i++;
+        requestAnimationFrame(animateCar);
+    }
+
+    animateCar();
 }
