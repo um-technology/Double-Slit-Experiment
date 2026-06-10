@@ -273,13 +273,12 @@ async function drawTrack() {
         `https://api.openf1.org/v1/location?session_key=${SESSION_KEY}&driver_number=${DRIVER_NUMBER}`
     );
 
-    if (!Array.isArray(positions) || positions.length < 2) {
+    if (!Array.isArray(positions) || positions.length < 5) {
         console.warn("No track data");
         return;
     }
 
     const canvas = document.getElementById("trackMap");
-
     if (!canvas) return;
 
     const ctx = canvas.getContext("2d");
@@ -289,6 +288,9 @@ async function drawTrack() {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    /* -----------------------------
+       EXTRACT DATA
+    ------------------------------*/
     const xs = positions.map(p => p.x);
     const ys = positions.map(p => p.y);
 
@@ -297,27 +299,102 @@ async function drawTrack() {
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
 
+    const scale = 0.92; // padding inside canvas
+
     const scaleX = x =>
-        ((x - minX) / (maxX - minX || 1)) * canvas.width;
+        ((x - minX) / (maxX - minX || 1)) * canvas.width * scale + canvas.width * (1 - scale) / 2;
 
     const scaleY = y =>
-        canvas.height - ((y - minY) / (maxY - minY || 1)) * canvas.height;
+        canvas.height -
+        (((y - minY) / (maxY - minY || 1)) * canvas.height * scale + canvas.height * (1 - scale) / 2);
 
-    ctx.strokeStyle = "#e10600";
-    ctx.lineWidth = 3;
+    /* -----------------------------
+       SIMPLE SMOOTHING (moving average)
+    ------------------------------*/
+    const smooth = (arr, window = 3) => {
+        return arr.map((_, i) => {
+            const start = Math.max(0, i - window);
+            const end = Math.min(arr.length, i + window);
+            const slice = arr.slice(start, end);
+            return slice.reduce((a, b) => a + b, 0) / slice.length;
+        });
+    };
+
+    const sx = smooth(xs);
+    const sy = smooth(ys);
+
+    const points = sx.map((x, i) => ({
+        x: scaleX(x),
+        y: scaleY(sy[i])
+    }));
+
+    /* -----------------------------
+       BACKGROUND "GHOST TRACK"
+    ------------------------------*/
+    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+
+    points.forEach((p, i) => {
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+    });
+
+    ctx.stroke();
+
+    /* -----------------------------
+       MAIN TRACK LINE (gradient)
+    ------------------------------*/
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    gradient.addColorStop(0, "#00d4ff");
+    gradient.addColorStop(0.5, "#e10600");
+    gradient.addColorStop(1, "#ffcc00");
+
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = 4;
+    ctx.shadowColor = "#e10600";
+    ctx.shadowBlur = 12;
 
     ctx.beginPath();
 
-    for (let i = 0; i < positions.length; i++) {
-
-        const p = positions[i];
-
-        const x = scaleX(p.x);
-        const y = scaleY(p.y);
-
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-    }
+    points.forEach((p, i) => {
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+    });
 
     ctx.stroke();
+
+    /* -----------------------------
+       DIRECTION DOTS (motion feel)
+    ------------------------------*/
+    ctx.shadowBlur = 0;
+
+    for (let i = 0; i < points.length; i += 15) {
+
+        const p = points[i];
+
+        ctx.fillStyle = "rgba(255,255,255,0.6)";
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    /* -----------------------------
+       START / END MARKERS
+    ------------------------------*/
+
+    const start = points[0];
+    const end = points[points.length - 1];
+
+    // start
+    ctx.fillStyle = "#00ff88";
+    ctx.beginPath();
+    ctx.arc(start.x, start.y, 6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // end
+    ctx.fillStyle = "#ff4444";
+    ctx.beginPath();
+    ctx.arc(end.x, end.y, 6, 0, Math.PI * 2);
+    ctx.fill();
 }
