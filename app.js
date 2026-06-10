@@ -9,9 +9,23 @@ let rpmChart;
 
 console.log("app.js loaded successfully");
 
-/* -----------------------------
-   SAFE FETCH (no crash version)
-------------------------------*/
+/* =========================================================
+   TIME FORMATTER (mm:ss.mmm)
+========================================================= */
+function formatLapTime(seconds) {
+
+    if (seconds === null || seconds === undefined || isNaN(seconds)) return "--";
+
+    const min = Math.floor(seconds / 60);
+    const sec = Math.floor(seconds % 60);
+    const ms = Math.round((seconds - Math.floor(seconds)) * 1000);
+
+    return `${min}:${sec.toString().padStart(2, "0")}.${ms.toString().padStart(3, "0")}`;
+}
+
+/* =========================================================
+   SAFE FETCH WRAPPER (prevents crashes / 429 issues)
+========================================================= */
 async function fetchOpenF1(url) {
 
     try {
@@ -19,21 +33,21 @@ async function fetchOpenF1(url) {
         const res = await fetch(url);
 
         if (!res.ok) {
-            console.warn("API error:", res.status);
+            console.warn("API error:", res.status, url);
             return [];
         }
 
         return await res.json();
 
     } catch (err) {
-        console.error("Fetch failed:", err);
+        console.error("Fetch failed:", err, url);
         return [];
     }
 }
 
-/* -----------------------------
-   ENTRY POINT (MUST WORK)
-------------------------------*/
+/* =========================================================
+   ENTRY POINT
+========================================================= */
 window.loadData = async function loadData() {
 
     console.log("loadData triggered");
@@ -65,16 +79,16 @@ window.loadData = async function loadData() {
     }
 };
 
-/* -----------------------------
-   DRIVER
-------------------------------*/
+/* =========================================================
+   DRIVER INFO
+========================================================= */
 async function loadDriver() {
 
     const data = await fetchOpenF1(
         `https://api.openf1.org/v1/drivers?session_key=${SESSION_KEY}&driver_number=${DRIVER_NUMBER}`
     );
 
-    if (!data.length) {
+    if (!Array.isArray(data) || !data.length) {
         console.warn("No driver data");
         return;
     }
@@ -92,9 +106,9 @@ async function loadDriver() {
     }
 }
 
-/* -----------------------------
-   LAPS (SAFE)
-------------------------------*/
+/* =========================================================
+   LAPS + FASTEST LAP
+========================================================= */
 async function loadLaps() {
 
     const laps = await fetchOpenF1(
@@ -115,26 +129,26 @@ async function loadLaps() {
     );
 
     document.getElementById("fastestLap").innerText =
-        fastest.lap_duration.toFixed(3);
+        formatLapTime(fastest.lap_duration);
 
     document.getElementById("position").innerText =
-        "P?"; // placeholder until safe logic later
+        "P?";
 
     document.getElementById("s1").innerText =
-        fastest.duration_sector_1?.toFixed?.(3) || "--";
+        formatLapTime(fastest.duration_sector_1);
 
     document.getElementById("s2").innerText =
-        fastest.duration_sector_2?.toFixed?.(3) || "--";
+        formatLapTime(fastest.duration_sector_2);
 
     document.getElementById("s3").innerText =
-        fastest.duration_sector_3?.toFixed?.(3) || "--";
+        formatLapTime(fastest.duration_sector_3);
 
     await loadTelemetry(fastest);
 }
 
-/* -----------------------------
-   TELEMETRY (SAFE)
-------------------------------*/
+/* =========================================================
+   TELEMETRY
+========================================================= */
 async function loadTelemetry(lap) {
 
     if (!lap?.date_start || !lap?.lap_duration) {
@@ -143,38 +157,73 @@ async function loadTelemetry(lap) {
     }
 
     const start = new Date(lap.date_start);
-
-    const end = new Date(
-        start.getTime() + lap.lap_duration * 1000
-    );
+    const end = new Date(start.getTime() + lap.lap_duration * 1000);
 
     const telemetry = await fetchOpenF1(
         `https://api.openf1.org/v1/car_data?session_key=${SESSION_KEY}&driver_number=${DRIVER_NUMBER}&date>=${start.toISOString()}&date<=${end.toISOString()}`
     );
 
     if (!Array.isArray(telemetry) || !telemetry.length) {
-        console.warn("No telemetry");
+        console.warn("No telemetry data");
         return;
     }
 
     const labels = telemetry.map((_, i) => i);
 
-    const speeds = telemetry.map(t => t.speed);
-    const throttle = telemetry.map(t => t.throttle);
-    const brake = telemetry.map(t => t.brake ? 100 : 0);
-    const gear = telemetry.map(t => t.n_gear);
-    const rpm = telemetry.map(t => t.rpm);
+    createChart(
+        "speedChart",
+        speedChart,
+        "Speed",
+        telemetry.map(t => t.speed),
+        "#00d4ff",
+        c => speedChart = c,
+        labels
+    );
 
-    createChart("speedChart", speedChart, "Speed", speeds, "#00d4ff", c => speedChart = c, labels);
-    createChart("throttleChart", throttleChart, "Throttle", throttle, "#00ff88", c => throttleChart = c, labels);
-    createChart("brakeChart", brakeChart, "Brake", brake, "#ff4444", c => brakeChart = c, labels);
-    createChart("gearChart", gearChart, "Gear", gear, "#ffd000", c => gearChart = c, labels);
-    createChart("rpmChart", rpmChart, "RPM", rpm, "#b06cff", c => rpmChart = c, labels);
+    createChart(
+        "throttleChart",
+        throttleChart,
+        "Throttle",
+        telemetry.map(t => t.throttle),
+        "#00ff88",
+        c => throttleChart = c,
+        labels
+    );
+
+    createChart(
+        "brakeChart",
+        brakeChart,
+        "Brake",
+        telemetry.map(t => t.brake ? 100 : 0),
+        "#ff4444",
+        c => brakeChart = c,
+        labels
+    );
+
+    createChart(
+        "gearChart",
+        gearChart,
+        "Gear",
+        telemetry.map(t => t.n_gear),
+        "#ffd000",
+        c => gearChart = c,
+        labels
+    );
+
+    createChart(
+        "rpmChart",
+        rpmChart,
+        "RPM",
+        telemetry.map(t => t.rpm),
+        "#b06cff",
+        c => rpmChart = c,
+        labels
+    );
 }
 
-/* -----------------------------
-   CHART SAFE VERSION
-------------------------------*/
+/* =========================================================
+   CHART RENDERER
+========================================================= */
 function createChart(canvasId, chart, label, data, color, save, labels) {
 
     const canvas = document.getElementById(canvasId);
@@ -196,21 +245,28 @@ function createChart(canvasId, chart, label, data, color, save, labels) {
                 label,
                 data,
                 borderColor: color,
-                tension: 0.3,
-                pointRadius: 0
+                tension: 0.35,
+                pointRadius: 0,
+                borderWidth: 2,
+                fill: false
             }]
         },
         options: {
-            responsive: true
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: "index",
+                intersect: false
+            }
         }
     });
 
     save(newChart);
 }
 
-/* -----------------------------
-   TRACK (ULTRA SAFE)
-------------------------------*/
+/* =========================================================
+   TRACK MAP
+========================================================= */
 async function drawTrack() {
 
     const positions = await fetchOpenF1(
@@ -241,8 +297,11 @@ async function drawTrack() {
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
 
-    const scaleX = x => ((x - minX) / (maxX - minX || 1)) * 900 + 50;
-    const scaleY = y => ((y - minY) / (maxY - minY || 1)) * 400 + 50;
+    const scaleX = x =>
+        ((x - minX) / (maxX - minX || 1)) * canvas.width;
+
+    const scaleY = y =>
+        canvas.height - ((y - minY) / (maxY - minY || 1)) * canvas.height;
 
     ctx.strokeStyle = "#e10600";
     ctx.lineWidth = 3;
