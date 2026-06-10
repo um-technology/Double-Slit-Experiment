@@ -113,7 +113,6 @@ async function loadTelemetry(lap) {
     rpmChart = createChart("rpmChart", "RPM",
         smooth(telemetryData.map(x => x.rpm)), "#b06cff", labels);
 
-    setTimeout(initF1HoverSystem, 150);
 }
 
 // ========================
@@ -173,96 +172,6 @@ function createChart(canvasId, label, data, color, labels) {
     });
 }
 
-// ========================
-// F1 HOVER SYSTEM (FIXED)
-// ========================
-function initF1HoverSystem() {
-    const charts = [
-        speedChart,
-        throttleChart,
-        brakeChart,
-        gearChart,
-        rpmChart
-    ];
-
-    const overlay = createOverlay();
-
-    charts.forEach(chart => {
-        chart.canvas.addEventListener("mousemove", (e) => {
-
-    const rect = chart.canvas.getBoundingClientRect(); // ✅ ONLY ONCE
-    const xPixel = e.clientX - rect.left;
-
-    const indexFloat = chart.scales.x.getValueForPixel(xPixel);
-    const i = Math.max(0, Math.min(telemetryData.length - 1, Math.floor(indexFloat)));
-
-    const t = telemetryData[i];
-    if (!t) return;
-
-    drawCursorAcrossCharts(i);
-
-    overlay.innerHTML = `
-        <div><b>Speed:</b> ${t.speed}</div>
-        <div><b>Throttle:</b> ${t.throttle}</div>
-        <div><b>Brake:</b> ${t.brake ? "ON" : "OFF"}</div>
-        <div><b>Gear:</b> ${t.n_gear}</div>
-        <div><b>RPM:</b> ${t.rpm}</div>
-    `;
-});
-    });
-}
-
-// ========================
-// OVERLAY
-// ========================
-function createOverlay() {
-    let el = document.getElementById("telemetryOverlay");
-    if (el) return el;
-
-    el = document.createElement("div");
-    el.id = "telemetryOverlay";
-
-    Object.assign(el.style, {
-        position: "absolute",
-        top: "20px",
-        right: "20px",
-        background: "rgba(0,0,0,0.75)",
-        color: "white",
-        padding: "10px",
-        fontFamily: "monospace",
-        borderRadius: "8px",
-        pointerEvents: "none"
-    });
-
-    document.body.appendChild(el);
-    return el;
-}
-
-// ========================
-// SYNCHRONIZED CURSOR (NO STRETCH BUG)
-// ========================
-function drawCursorAcrossCharts(index) {
-    [speedChart, throttleChart, brakeChart, gearChart, rpmChart].forEach(chart => {
-        if (!chart) return;
-
-        const { ctx, chartArea, scales } = chart;
-        if (!chartArea) return;
-
-        const xPixel = scales.x.getPixelForValue(index);
-
-        ctx.save();
-
-        ctx.strokeStyle = "rgba(255,255,255,0.25)";
-        ctx.lineWidth = 1;
-
-        ctx.beginPath();
-        ctx.moveTo(xPixel, chartArea.top);
-        ctx.lineTo(xPixel, chartArea.bottom);
-        ctx.stroke();
-
-        ctx.restore();
-    });
-}
 
 // ========================
 // TRACK (CACHED + SAFE)
