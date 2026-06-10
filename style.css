@@ -346,3 +346,73 @@ h2{
     }
 
 }
+#driverCard {
+
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:30px;
+    flex-wrap:wrap;
+}
+
+.driver-header {
+
+    width:100%;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    flex-wrap:wrap;
+}
+
+.driver-main {
+
+    display:flex;
+    align-items:center;
+    gap:20px;
+}
+
+.driver-number {
+
+    font-size:3rem;
+    font-weight:900;
+    color:#e10600;
+    line-height:1;
+}
+
+.driver-main h2 {
+
+    font-size:2rem;
+    margin:0;
+}
+
+.driver-meta {
+
+    color:#8f97aa;
+    margin-top:6px;
+}
+
+.driver-extra {
+
+    display:flex;
+    gap:30px;
+    flex-wrap:wrap;
+}
+
+.driver-stat {
+
+    text-align:center;
+}
+
+.driver-stat span {
+
+    display:block;
+    color:#8f97aa;
+    font-size:.8rem;
+    margin-bottom:4px;
+}
+
+.driver-stat strong {
+
+    font-family:'JetBrains Mono', monospace;
+    font-size:1.1rem;
+}
