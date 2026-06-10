@@ -23,24 +23,48 @@ function formatLapTime(seconds) {
     return `${min}:${sec.toString().padStart(2, "0")}.${ms.toString().padStart(3, "0")}`;
 }
 
-/* =========================================================
-   SAFE FETCH WRAPPER (prevents crashes / 429 issues)
-========================================================= */
+const cache = new Map();
+let lastRequestTime = 0;
+
 async function fetchOpenF1(url) {
+
+    const now = Date.now();
+
+    // enforce 400ms delay between requests
+    const wait = 400 - (now - lastRequestTime);
+
+    if (wait > 0) {
+        await new Promise(r => setTimeout(r, wait));
+    }
+
+    lastRequestTime = Date.now();
+
+    if (cache.has(url)) {
+        return cache.get(url);
+    }
 
     try {
 
         const res = await fetch(url);
 
+        if (res.status === 429) {
+            console.warn("Rate limited, retrying in 1s...");
+            await new Promise(r => setTimeout(r, 1000));
+            return fetchOpenF1(url);
+        }
+
         if (!res.ok) {
-            console.warn("API error:", res.status, url);
+            console.warn("API error:", res.status);
             return [];
         }
 
-        return await res.json();
+        const data = await res.json();
+        cache.set(url, data);
+
+        return data;
 
     } catch (err) {
-        console.error("Fetch failed:", err, url);
+        console.error("Fetch failed:", err);
         return [];
     }
 }
