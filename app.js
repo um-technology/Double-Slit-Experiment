@@ -407,14 +407,20 @@ async function drawTrack() {
        ANIMATED CAR DOT
     ------------------------------*/
     let i = 0;
+    let animationId;
 
     function animateCar() {
 
-        if (i >= points.length) i = 0;
+    if (!points || points.length === 0) return;
+
+    // stop previous loop (prevents stacking loops)
+    if (animationId) cancelAnimationFrame(animationId);
+
+    const render = () => {
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // redraw heatmap each frame
+        /* redraw track */
         for (let j = 1; j < points.length; j++) {
 
             const p1 = points[j - 1];
@@ -435,22 +441,31 @@ async function drawTrack() {
             ctx.stroke();
         }
 
+        /* moving car */
         const p = points[i];
 
-        // moving car
-        ctx.fillStyle = "#ffffff";
-        ctx.shadowColor = "#00d4ff";
-        ctx.shadowBlur = 15;
+        if (!p) {
+            i = 0;
+        } else {
 
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
-        ctx.fill();
+            ctx.fillStyle = "#fff";
+            ctx.shadowColor = "#00d4ff";
+            ctx.shadowBlur = 15;
 
-        ctx.shadowBlur = 0;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+            ctx.fill();
 
-        i++;
-        requestAnimationFrame(animateCar);
-    }
+            ctx.shadowBlur = 0;
 
-    animateCar();
+            i++;
+        }
+
+        animationId = requestAnimationFrame(render);
+    };
+
+    render();
+}
+
+animateCar();
 }
