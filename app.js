@@ -358,7 +358,7 @@ async function drawTrack() {
 
     const drawSectorOverlay = (start, end, color, label) => {
 
-        ctx.strokeStyle = color;
+        ctx.strokeStyle = "#e10600";
         ctx.lineWidth = 6;
         ctx.globalAlpha = 0.15;
 
