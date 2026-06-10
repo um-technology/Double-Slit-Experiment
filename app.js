@@ -291,22 +291,39 @@ async function drawTrack() {
     /* -----------------------------
        EXTRACT DATA
     ------------------------------*/
-    const xs = positions.map(p => p.x);
-    const ys = positions.map(p => p.y);
+    const xs = clean.map(p => p.x);
+const ys = clean.map(p => p.y);
 
-    const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
-    const minY = Math.min(...ys);
-    const maxY = Math.max(...ys);
+const minX = Math.min(...xs);
+const maxX = Math.max(...xs);
+const minY = Math.min(...ys);
+const maxY = Math.max(...ys);
 
-    const scale = 0.92; // padding inside canvas
+const rangeX = maxX - minX || 1;
+const rangeY = maxY - minY || 1;
 
-    const scaleX = x =>
-        ((x - minX) / (maxX - minX || 1)) * canvas.width * scale + canvas.width * (1 - scale) / 2;
+/* -----------------------------
+   UNIFORM SCALE (KEY FIX)
+------------------------------*/
+const scale = Math.min(
+    canvas.width / rangeX,
+    canvas.height / rangeY
+) * 0.9; // padding
 
-    const scaleY = y =>
-        canvas.height -
-        (((y - minY) / (maxY - minY || 1)) * canvas.height * scale + canvas.height * (1 - scale) / 2);
+/* -----------------------------
+   CENTERING OFFSETS
+------------------------------*/
+const offsetX =
+    (canvas.width - rangeX * scale) / 2;
+
+const offsetY =
+    (canvas.height - rangeY * scale) / 2;
+
+const scaleX = x =>
+    (x - minX) * scale + offsetX;
+
+const scaleY = y =>
+    canvas.height - ((y - minY) * scale + offsetY);
 
     /* -----------------------------
        SIMPLE SMOOTHING (moving average)
