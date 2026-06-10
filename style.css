@@ -303,9 +303,14 @@ button:hover{
     font-weight:700;
 }
 
-canvas{
+canvas {
+    width: 100% !important;
+    height: 300px !important;
+    display: block;
+}
 
-    width:100%;
+.chart-card canvas {
+    height: 320px !important;
 }
 
 #trackMap{
