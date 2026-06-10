@@ -167,6 +167,7 @@ async function loadDriver() {
     </div>
     `;
 }
+}
 
 /* =========================================================
    LAPS + FASTEST LAP
