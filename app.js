@@ -387,44 +387,55 @@ async function drawTrack() {
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
 
-    const scaleX =
-        x => ((x - minX) / (maxX - minX || 1)) * 900 + 50;
+    const scaleX = x =>
+        ((x - minX) / (maxX - minX || 1)) * 900 + 50;
 
-    const scaleY =
-        y => ((y - minY) / (maxY - minY || 1)) * 400 + 50;
+    const scaleY = y =>
+        ((y - minY) / (maxY - minY || 1)) * 400 + 50;
 
-    /* track base */
+    // base track
     ctx.strokeStyle = "#1f1f1f";
     ctx.lineWidth = 10;
 
     ctx.beginPath();
 
-    positions.forEach((p, i) => {
+    for (let i = 0; i < positions.length; i++) {
+
+        const p = positions[i];
 
         const x = scaleX(p.x);
         const y = scaleY(p.y);
 
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    });
+        if (i === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+    }
 
     ctx.stroke();
 
-    /* racing line */
+    // racing line
     ctx.strokeStyle = "#e10600";
     ctx.lineWidth = 4;
-
     ctx.shadowColor = "#e10600";
     ctx.shadowBlur = 10;
 
     ctx.beginPath();
 
-    positions.forEach((p, i) => {
+    for (let i = 0; i < positions.length; i++) {
+
+        const p = positions[i];
 
         const x = scaleX(p.x);
         const y = scaleY(p.y);
 
-        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    });
+        if (i === 0) {
+            ctx.moveTo(x, y);
+        } else {
+            ctx.lineTo(x, y);
+        }
+    }
 
     ctx.stroke();
 }
