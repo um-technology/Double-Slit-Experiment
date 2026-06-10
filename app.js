@@ -298,7 +298,7 @@ async function drawTrack() {
     );
 
     if (!Array.isArray(positions) || positions.length < 5) {
-        console.warn("No track data");
+        console.warn("No valid track data");
         return;
     }
 
@@ -307,133 +307,95 @@ async function drawTrack() {
 
     const ctx = canvas.getContext("2d");
 
-    canvas.width = 1000;
-    canvas.height = 500;
+    // FIX: match real displayed size
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     /* -----------------------------
-       EXTRACT DATA
+       FIX: define clean data properly
     ------------------------------*/
+    const clean = positions.filter(p =>
+        p &&
+        typeof p.x === "number" &&
+        typeof p.y === "number" &&
+        !isNaN(p.x) &&
+        !isNaN(p.y)
+    );
+
+    if (clean.length < 5) {
+        console.warn("Track data invalid after filtering");
+        return;
+    }
+
     const xs = clean.map(p => p.x);
-const ys = clean.map(p => p.y);
+    const ys = clean.map(p => p.y);
 
-const minX = Math.min(...xs);
-const maxX = Math.max(...xs);
-const minY = Math.min(...ys);
-const maxY = Math.max(...ys);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
 
-const rangeX = maxX - minX || 1;
-const rangeY = maxY - minY || 1;
+    const rangeX = maxX - minX || 1;
+    const rangeY = maxY - minY || 1;
 
-/* -----------------------------
-   UNIFORM SCALE (KEY FIX)
-------------------------------*/
-const scale = Math.min(
-    canvas.width / rangeX,
-    canvas.height / rangeY
-) * 0.9; // padding
+    const scale = Math.min(
+        canvas.width / rangeX,
+        canvas.height / rangeY
+    ) * 0.9;
 
-/* -----------------------------
-   CENTERING OFFSETS
-------------------------------*/
-const offsetX =
-    (canvas.width - rangeX * scale) / 2;
+    const offsetX = (canvas.width - rangeX * scale) / 2;
+    const offsetY = (canvas.height - rangeY * scale) / 2;
 
-const offsetY =
-    (canvas.height - rangeY * scale) / 2;
+    const scaleX = x => (x - minX) * scale + offsetX;
+    const scaleY = y => canvas.height - ((y - minY) * scale + offsetY);
 
-const scaleX = x =>
-    (x - minX) * scale + offsetX;
-
-const scaleY = y =>
-    canvas.height - ((y - minY) * scale + offsetY);
-
-    /* -----------------------------
-       SIMPLE SMOOTHING (moving average)
-    ------------------------------*/
-    const smooth = (arr, window = 3) => {
-        return arr.map((_, i) => {
-            const start = Math.max(0, i - window);
-            const end = Math.min(arr.length, i + window);
-            const slice = arr.slice(start, end);
-            return slice.reduce((a, b) => a + b, 0) / slice.length;
-        });
-    };
-
-    const sx = smooth(xs);
-    const sy = smooth(ys);
-
-    const points = sx.map((x, i) => ({
-        x: scaleX(x),
-        y: scaleY(sy[i])
+    const points = clean.map(p => ({
+        x: scaleX(p.x),
+        y: scaleY(p.y)
     }));
 
     /* -----------------------------
-       BACKGROUND "GHOST TRACK"
+       DRAW TRACK
     ------------------------------*/
-    ctx.strokeStyle = "rgba(255,255,255,0.05)";
-    ctx.lineWidth = 10;
+    ctx.strokeStyle = "#444";
+    ctx.lineWidth = 8;
     ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
 
-    points.forEach((p, i) => {
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-    });
-
+    for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x, points[i].y);
+    }
     ctx.stroke();
 
-    /* -----------------------------
-       MAIN TRACK LINE (gradient)
-    ------------------------------*/
-    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    gradient.addColorStop(0, "#00d4ff");
-    gradient.addColorStop(0.5, "#e10600");
-    gradient.addColorStop(1, "#ffcc00");
-
-    ctx.strokeStyle = gradient;
-    ctx.lineWidth = 4;
+    ctx.strokeStyle = "#e10600";
+    ctx.lineWidth = 3;
     ctx.shadowColor = "#e10600";
-    ctx.shadowBlur = 12;
+    ctx.shadowBlur = 10;
 
     ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
 
-    points.forEach((p, i) => {
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-    });
-
+    for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x, points[i].y);
+    }
     ctx.stroke();
 
-    /* -----------------------------
-       DIRECTION DOTS (motion feel)
-    ------------------------------*/
     ctx.shadowBlur = 0;
 
-    for (let i = 0; i < points.length; i += 15) {
-
-        const p = points[i];
-
-        ctx.fillStyle = "rgba(255,255,255,0.6)";
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
     /* -----------------------------
-       START / END MARKERS
+       START / END
     ------------------------------*/
-
     const start = points[0];
     const end = points[points.length - 1];
 
-    // start
     ctx.fillStyle = "#00ff88";
     ctx.beginPath();
     ctx.arc(start.x, start.y, 6, 0, Math.PI * 2);
     ctx.fill();
 
-    // end
     ctx.fillStyle = "#ff4444";
     ctx.beginPath();
     ctx.arc(end.x, end.y, 6, 0, Math.PI * 2);
