@@ -19,21 +19,9 @@
 
         <div class="search-box">
 
-            <input
-                id="sessionKey"
-                placeholder="Session Key (e.g. Monaco Quali)"
-            >
+            <input id="sessionKey" placeholder="Session Key (e.g. Monaco Quali)">
 
-            <input
-                id="driverNumber1"
-                placeholder="Driver 1 (e.g. 1)"
-            >
-
-            <input
-                id="driverNumber2"
-                placeholder="Driver 2 (e.g. 16)"
-            >
-            
+            <input id="driverNumber" placeholder="Driver Number (e.g. 16)">
 
             <button onclick="loadData()">
                 Load Session
@@ -42,12 +30,8 @@
         </div>
     </header>
 
-    <div id="driverCards" class="card">
+    <div id="driverCard" class="card">
         Select a session and driver.
-    </div>
-
-    <div id="comparisonCard" class="card">
-        Waiting for comparison...
     </div>
 
     <div class="stats">
@@ -63,29 +47,28 @@
         </div>
 
         <div class="card stat-card">
-    <h3>Average Lap</h3>
-    <span id="averageLap">--</span>
-</div>
+            <h3>Average Lap</h3>
+            <span id="averageLap">--</span>
+        </div>
 
-<div class="card stat-card">
-    <h3>Top Speed</h3>
-    <span id="topSpeed">--</span>
-</div>
+        <div class="card stat-card">
+            <h3>Top Speed</h3>
+            <span id="topSpeed">--</span>
+        </div>
 
-<div class="card stat-card">
-    <h3>Throttle Avg</h3>
-    <span id="avgThrottle">--</span>
-</div>
+        <div class="card stat-card">
+            <h3>Throttle Avg</h3>
+            <span id="avgThrottle">--</span>
+        </div>
 
-<div class="card stat-card">
-    <h3>Brake Usage</h3>
-    <span id="brakeUsage">--</span>
-</div>
+        <div class="card stat-card">
+            <h3>Brake Usage</h3>
+            <span id="brakeUsage">--</span>
+        </div>
 
     </div>
 
     <div class="card">
-
         <h2>Sectors</h2>
 
         <div class="sector-grid">
@@ -106,15 +89,11 @@
             </div>
 
         </div>
-
     </div>
 
     <div class="card">
-
         <h2>Track Map</h2>
-
         <canvas id="trackMap"></canvas>
-
     </div>
 
     <div class="card">
