@@ -25,9 +25,15 @@
             >
 
             <input
-                id="driverNumber"
-                placeholder="Driver Number (e.g. 16)"
+                id="driverNumber1"
+                placeholder="Driver 1 (e.g. 1)"
             >
+
+            <input
+                id="driverNumber2"
+                placeholder="Driver 2 (e.g. 16)"
+            >
+            
 
             <button onclick="loadData()">
                 Load Session
@@ -36,8 +42,12 @@
         </div>
     </header>
 
-    <div id="driverCard" class="card">
+    <div id="driverCards" class="card">
         Select a session and driver.
+    </div>
+
+    <div id="comparisonCard" class="card">
+        Waiting for comparison...
     </div>
 
     <div class="stats">
