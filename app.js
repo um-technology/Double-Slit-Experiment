@@ -1,5 +1,6 @@
 let SESSION_KEY;
-let DRIVER_NUMBER;
+let DRIVER_1;
+let DRIVER_2;
 
 let speedChart;
 let throttleChart;
@@ -77,7 +78,11 @@ window.loadData = async function loadData() {
     console.log("loadData triggered");
 
     const sessionInput = document.getElementById("sessionKey");
-    const driverInput = document.getElementById("driverNumber");
+    DRIVER_1 =
+       document.getElementById("driverNumber1").value.trim();
+
+    DRIVER_2 =
+       document.getElementById("driverNumber2").value.trim();
 
     if (!sessionInput || !driverInput) {
         alert("Missing inputs in HTML");
@@ -87,10 +92,10 @@ window.loadData = async function loadData() {
     SESSION_KEY = sessionInput.value.trim();
     DRIVER_NUMBER = driverInput.value.trim();
 
-    if (!SESSION_KEY || !DRIVER_NUMBER) {
-        alert("Enter session key + driver number");
-        return;
-    }
+    if (!SESSION_KEY || !DRIVER_1 || !DRIVER_2) {
+       alert("Enter session key + both driver numbers");
+       return;
+   }
 
     try {
 
