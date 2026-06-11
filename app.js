@@ -191,11 +191,19 @@ async function loadLaps() {
         a.lap_duration < b.lap_duration ? a : b
     );
 
+    const averageLap =
+    valid.reduce(
+        (sum, lap) => sum + lap.lap_duration,
+        0
+    ) / valid.length;
+
+const position = await getPosition();
+
     document.getElementById("fastestLap").innerText =
         formatLapTime(fastest.lap_duration);
 
     document.getElementById("position").innerText =
-        "P?";
+        `P${position}`;
 
     document.getElementById("s1").innerText =
         formatLapTime(fastest.duration_sector_1);
@@ -206,8 +214,51 @@ async function loadLaps() {
     document.getElementById("s3").innerText =
         formatLapTime(fastest.duration_sector_3);
 
+    const avgEl =
+        document.getElementById("averageLap");
+
+    if (avgEl)
+        avgEl.innerText =
+            formatLapTime(averageLap);
+
     await loadTelemetry(fastest);
 }
+
+async function getPosition() {
+
+    const allLaps = await fetchOpenF1(
+        `https://api.openf1.org/v1/laps?session_key=${SESSION_KEY}`
+    );
+
+    if (!Array.isArray(allLaps) || !allLaps.length)
+        return "--";
+
+    const bestLaps = {};
+
+    allLaps.forEach(lap => {
+
+        if (!lap.lap_duration) return;
+
+        const driver = lap.driver_number;
+
+        if (
+            !bestLaps[driver] ||
+            lap.lap_duration < bestLaps[driver]
+        ) {
+            bestLaps[driver] = lap.lap_duration;
+        }
+    });
+
+    const ranking = Object.entries(bestLaps)
+        .sort((a, b) => a[1] - b[1]);
+
+    const pos = ranking.findIndex(
+        x => Number(x[0]) === Number(DRIVER_NUMBER)
+    );
+
+    return pos >= 0 ? pos + 1 : "--";
+}
+
 
 /* =========================================================
    TELEMETRY
@@ -232,6 +283,29 @@ async function loadTelemetry(lap) {
     }
 
     const labels = telemetry.map((_, i) => i);
+
+    const maxSpeed =
+    Math.max(...telemetry.map(t => t.speed || 0));
+
+const avgThrottle =
+    telemetry.reduce(
+        (sum, t) => sum + (t.throttle || 0),
+        0
+    ) / telemetry.length;
+
+const brakeUsage =
+    telemetry.filter(
+        t => t.brake
+    ).length / telemetry.length * 100;
+
+   document.getElementById("topSpeed").innerText =
+    `${Math.round(maxSpeed)} km/h`;
+
+document.getElementById("avgThrottle").innerText =
+    `${avgThrottle.toFixed(1)}%`;
+
+document.getElementById("brakeUsage").innerText =
+    `${brakeUsage.toFixed(1)}%`;
 
     createChart(
         "speedChart",
