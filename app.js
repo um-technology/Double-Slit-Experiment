@@ -14,7 +14,6 @@ console.log("app.js loaded successfully");
    TIME FORMATTER (mm:ss.mmm)
 ========================================================= */
 function formatLapTime(seconds) {
-
     if (seconds === null || seconds === undefined || isNaN(seconds)) return "--";
 
     const min = Math.floor(seconds / 60);
@@ -24,14 +23,14 @@ function formatLapTime(seconds) {
     return `${min}:${sec.toString().padStart(2, "0")}.${ms.toString().padStart(3, "0")}`;
 }
 
+/* =========================================================
+   CACHE + FETCH
+========================================================= */
 const cache = new Map();
 let lastRequestTime = 0;
 
 async function fetchOpenF1(url) {
-
     const now = Date.now();
-
-    // enforce 400ms delay between requests
     const wait = 400 - (now - lastRequestTime);
 
     if (wait > 0) {
@@ -40,16 +39,13 @@ async function fetchOpenF1(url) {
 
     lastRequestTime = Date.now();
 
-    if (cache.has(url)) {
-        return cache.get(url);
-    }
+    if (cache.has(url)) return cache.get(url);
 
     try {
-
         const res = await fetch(url);
 
         if (res.status === 429) {
-            console.warn("Rate limited, retrying in 1s...");
+            console.warn("Rate limited, retrying...");
             await new Promise(r => setTimeout(r, 1000));
             return fetchOpenF1(url);
         }
@@ -61,7 +57,6 @@ async function fetchOpenF1(url) {
 
         const data = await res.json();
         cache.set(url, data);
-
         return data;
 
     } catch (err) {
@@ -71,109 +66,101 @@ async function fetchOpenF1(url) {
 }
 
 /* =========================================================
-   ENTRY POINT
+   ENTRY POINT (FIXED FOR 2 DRIVERS)
 ========================================================= */
 window.loadData = async function loadData() {
 
     console.log("loadData triggered");
 
     const sessionInput = document.getElementById("sessionKey");
-    DRIVER_1 =
-       document.getElementById("driverNumber1").value.trim();
+    const driver1Input = document.getElementById("driverNumber1");
+    const driver2Input = document.getElementById("driverNumber2");
 
-    DRIVER_2 =
-       document.getElementById("driverNumber2").value.trim();
-
-    if (!sessionInput || !driverInput) {
+    if (!sessionInput || !driver1Input || !driver2Input) {
         alert("Missing inputs in HTML");
         return;
     }
 
     SESSION_KEY = sessionInput.value.trim();
-    DRIVER_NUMBER = driverInput.value.trim();
+    DRIVER_1 = driver1Input.value.trim();
+    DRIVER_2 = driver2Input.value.trim();
 
     if (!SESSION_KEY || !DRIVER_1 || !DRIVER_2) {
-       alert("Enter session key + both driver numbers");
-       return;
-   }
+        alert("Enter session key + both driver numbers");
+        return;
+    }
 
     try {
-
-        await loadDriver();
-        await loadLaps();
+        await loadDriver(DRIVER_1, "driverCard");
+        await loadDriver(DRIVER_2, "driverCard2"); // optional second card
+        await loadLaps(); // you will later split this per driver
         await drawTrack();
-
     } catch (err) {
         console.error("Main load error:", err);
     }
 };
 
 /* =========================================================
-   DRIVER INFO
+   DRIVER INFO (NOW REUSABLE FOR BOTH DRIVERS)
 ========================================================= */
-async function loadDriver() {
+async function loadDriver(driverNumber, elementId) {
 
     const data = await fetchOpenF1(
-        `https://api.openf1.org/v1/drivers?session_key=${SESSION_KEY}&driver_number=${DRIVER_NUMBER}`
+        `https://api.openf1.org/v1/drivers?session_key=${SESSION_KEY}&driver_number=${driverNumber}`
     );
 
     if (!Array.isArray(data) || !data.length) {
-        console.warn("No driver data");
+        console.warn(`No driver data for ${driverNumber}`);
         return;
     }
 
     const d = data[0];
 
-    const el = document.getElementById("driverCard");
+    const el = document.getElementById(elementId);
 
-    if (el) {
+    if (!el) return;
+
     el.innerHTML = `
-    <div class="driver-header">
+        <div class="driver-header">
 
-        <div class="driver-main">
+            <div class="driver-main">
 
-            <div class="driver-number">
-                #${d.driver_number}
+                <div class="driver-number">
+                    #${d.driver_number}
+                </div>
+
+                <div>
+                    <h2>${d.full_name}</h2>
+
+                    <div class="driver-meta">
+                        ${d.name_acronym || ""} • ${d.team_name || "Unknown Team"}
+                    </div>
+                </div>
+
             </div>
 
-            <div>
+            <div class="driver-extra">
 
-                <h2>${d.full_name}</h2>
+                <div class="driver-stat">
+                    <span>Nationality</span>
+                    <strong>${d.country_code || "--"}</strong>
+                </div>
 
-                <div class="driver-meta">
-                    ${d.name_acronym || ""}
-                    •
-                    ${d.team_name || "Unknown Team"}
+                <div class="driver-stat">
+                    <span>Session</span>
+                    <strong>${SESSION_KEY}</strong>
+                </div>
+
+                <div class="driver-stat">
+                    <span>Driver No.</span>
+                    <strong>${d.driver_number}</strong>
                 </div>
 
             </div>
 
         </div>
-
-        <div class="driver-extra">
-
-            <div class="driver-stat">
-                <span>Nationality</span>
-                <strong>${d.country_code || "--"}</strong>
-            </div>
-
-            <div class="driver-stat">
-                <span>Session</span>
-                <strong>${SESSION_KEY}</strong>
-            </div>
-
-            <div class="driver-stat">
-                <span>Driver No.</span>
-                <strong>${d.driver_number}</strong>
-            </div>
-
-        </div>
-
-    </div>
     `;
-}
-}
-
+};
 /* =========================================================
    LAPS + FASTEST LAP
 ========================================================= */
